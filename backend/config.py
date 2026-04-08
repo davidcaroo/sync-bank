@@ -1,0 +1,23 @@
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    IMAP_HOST: str = "imap.gmail.com"
+    IMAP_PORT: int = 993
+    IMAP_USER: str
+    IMAP_PASS: str
+    
+    ALEGRA_EMAIL: str
+    ALEGRA_TOKEN: str
+    ALEGRA_CUENTA_DEFAULT_GASTOS: str = "5001"
+    
+    SUPABASE_URL: str
+    SUPABASE_KEY: str
+    
+    OLLAMA_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:3b"
+    AI_SERVICE_URL: str = "http://localhost:8001"
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()

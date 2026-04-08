@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENV=dev
+    env_file:
+      - .env
+    depends_on:
+      - ai-service
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    env_file:
+      - .env
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-service:/app
+    env_file:
+      - .env
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:
