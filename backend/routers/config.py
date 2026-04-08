@@ -21,6 +21,20 @@ async def get_alegra_catalogo(refresh: bool = Query(False)):
         "cost_centers": cost_centers or [],
     }
 
+
+@router.get("/alegra/proveedor/resolve")
+async def resolve_alegra_provider(
+    nit: str = Query(..., min_length=3),
+    nombre: str = Query(..., min_length=2),
+):
+    async with httpx.AsyncClient() as client:
+        provider_id = await alegra_service.get_provider_id(client, nit, nombre)
+    return {
+        "provider_id": provider_id,
+        "nit": nit,
+        "nombre": nombre,
+    }
+
 @router.get("/")
 async def list_config_cuentas(activo: bool | None = None):
     query = supabase.table("config_cuentas").select("*")

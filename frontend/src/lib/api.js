@@ -19,6 +19,12 @@ export const deleteConfigCuenta = (id) => api.delete(`/config/${id}`)
 
 export const getLogs = (params) => api.get('/logs', { params })
 
+export const getContactos = (params) => api.get('/contactos', { params })
+export const getContactoById = (id) => api.get(`/contactos/${id}`)
+export const createContacto = (payload) => api.post('/contactos', payload)
+export const updateContacto = (id, payload) => api.patch(`/contactos/${id}`, payload)
+export const deleteContacto = (id) => api.delete(`/contactos/${id}`)
+
 export const getProcesoStatus = () => api.get('/proceso/status')
 export const triggerProcesoManual = () => api.post('/proceso/manual')
 

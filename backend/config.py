@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:3b"
     AI_SERVICE_URL: str = "http://localhost:8001"
+    AI_CONFIDENCE_THRESHOLD: float = 0.65
 
     class Config:
         env_file = ".env"

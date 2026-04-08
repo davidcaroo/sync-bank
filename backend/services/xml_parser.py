@@ -4,6 +4,12 @@ from dateutil import parser
 from datetime import datetime
 import re
 
+
+def _normalize_nit(value: str | None) -> str:
+    if not value:
+        return ""
+    return re.sub(r"\D", "", value)
+
 def parse_xml_dian(xml_content: str) -> FacturaDIAN:
     tree = etree.fromstring(xml_content.encode('utf-8'))
     namespaces = {
@@ -15,11 +21,21 @@ def parse_xml_dian(xml_content: str) -> FacturaDIAN:
 
     # Unwrapping: If it's an AttachedDocument, the real invoice is inside
     if tree.tag.endswith('AttachedDocument'):
-        description_node = tree.xpath("//cbc:Description", namespaces=namespaces)
+        description_node = tree.xpath(
+            "//cac:Attachment/cac:ExternalReference/cbc:Description",
+            namespaces=namespaces,
+        )
         if description_node:
             try:
-                # Try to parse the content as a new XML
-                embedded_xml = description_node[0].text
+                # Pick the first embedded xml payload that actually contains an Invoice.
+                embedded_xml = ""
+                for node in description_node:
+                    candidate = (node.text or "").strip()
+                    if "<Invoice" in candidate:
+                        embedded_xml = candidate
+                        break
+                if not embedded_xml and description_node[0].text:
+                    embedded_xml = description_node[0].text
                 if embedded_xml and '<' in embedded_xml:
                     tree = etree.fromstring(embedded_xml.encode('utf-8'))
             except:
@@ -36,24 +52,29 @@ def parse_xml_dian(xml_content: str) -> FacturaDIAN:
     fecha_emision_raw = get_text("//cbc:IssueDate")
     
     # Robust metadata extraction
-    nit_proveedor = (
+    nit_proveedor_raw = (
         get_text("//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID") or 
         get_text("//cac:SenderParty/cac:PartyTaxScheme/cbc:CompanyID") or 
-        get_text("//cac:AccountingSupplierParty/cac:Party/cac:TaxScheme/cbc:ID") or
-        "999999999"
+        get_text("//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID") or
+        ""
     )
+    nit_proveedor = _normalize_nit(nit_proveedor_raw) or "999999999"
     
     nombre_proveedor = (
         get_text("//cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name") or 
+        get_text("//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:RegistrationName") or
+        get_text("//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName") or
         get_text("//cac:PartyName/cbc:Name") or 
         "Proveedor Generico"
     )
     
-    nit_receptor = (
+    nit_receptor_raw = (
         get_text("//cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID") or 
         get_text("//cac:ReceiverParty/cac:PartyTaxScheme/cbc:CompanyID") or 
-        "123456789"
+        get_text("//cac:AccountingCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID") or
+        ""
     )
+    nit_receptor = _normalize_nit(nit_receptor_raw) or "123456789"
 
     subtotal = float(get_text("//cac:LegalMonetaryTotal/cbc:LineExtensionAmount") or 0)
     total = float(get_text("//cac:LegalMonetaryTotal/cbc:PayableAmount") or 0)

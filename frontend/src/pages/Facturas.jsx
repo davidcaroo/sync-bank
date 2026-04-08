@@ -21,6 +21,15 @@ export default function Facturas() {
   const [causarLoading, setCausarLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const getBackendErrorMessage = (err, fallback) => {
+    const detail = err?.response?.data?.detail
+    if (typeof detail === 'string' && detail.trim()) return detail
+    if (detail && typeof detail === 'object' && typeof detail.message === 'string' && detail.message.trim()) {
+      return detail.message
+    }
+    return fallback
+  }
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / pageSize)), [count, pageSize])
 
   const fetchData = async () => {
@@ -98,8 +107,9 @@ export default function Facturas() {
       setSelected(null)
       toast.success('Factura causada correctamente en Alegra.')
     } catch (err) {
-      setError('No se pudo enviar a Alegra. Revisa la configuracion.')
-      toast.error('Fallo la causacion. Valida cuentas y centros por item.')
+      const msg = getBackendErrorMessage(err, 'No se pudo enviar a Alegra. Revisa la configuracion.')
+      setError(msg)
+      toast.error(msg)
     } finally {
       setCausarLoading(false)
     }
@@ -117,6 +127,11 @@ export default function Facturas() {
       render: (row) => <span className="text-blue-400 font-medium">{row.numero_factura}</span>,
     },
     { key: 'nombre_proveedor', label: 'Proveedor' },
+    {
+      key: 'nit_proveedor',
+      label: 'NIT',
+      render: (row) => row.nit_proveedor || '-',
+    },
     {
       key: 'total',
       label: 'Total',
@@ -161,6 +176,7 @@ export default function Facturas() {
             >
               <option value="">Todos</option>
               <option value="pendiente">Pendiente</option>
+              <option value="pendiente_revision">Pendiente revision</option>
               <option value="procesado">Procesado</option>
               <option value="error">Error</option>
               <option value="duplicado">Duplicado</option>

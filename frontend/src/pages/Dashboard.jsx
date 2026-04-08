@@ -144,6 +144,7 @@ export default function Dashboard() {
               <tr>
                 <th>Factura</th>
                 <th>Proveedor</th>
+                <th>NIT</th>
                 <th>Total</th>
                 <th>Estado</th>
                 <th>Fecha</th>
@@ -154,6 +155,7 @@ export default function Dashboard() {
                 <tr key={f.id} className="table-row-hover text-sm">
                   <td className="font-semibold">{f.numero_factura}</td>
                   <td>{f.nombre_proveedor}</td>
+                  <td>{f.nit_proveedor || '-'}</td>
                   <td>${parseFloat(f.total).toLocaleString()}</td>
                   <td>
                     <StatusBadge status={f.estado} />
@@ -165,7 +167,7 @@ export default function Dashboard() {
               ))}
               {recent.length === 0 && (
                 <tr>
-                  <td className="text-sm" colSpan={5}>
+                  <td className="text-sm" colSpan={6}>
                     No hay facturas recientes.
                   </td>
                 </tr>

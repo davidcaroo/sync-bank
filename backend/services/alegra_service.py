@@ -1,8 +1,44 @@
 import httpx
 import base64
+import re
 from datetime import datetime
 from config import settings
 from models.factura import FacturaDIAN
+
+
+class AlegraDuplicateBillError(Exception):
+    pass
+
+
+def _is_duplicate_bill_error(raw_error: str) -> bool:
+    text = (raw_error or "").lower()
+    duplicate_signals = [
+        "already exists",
+        "ya existe",
+        "duplic",
+        "documento repetido",
+        "document number",
+        "consecutivo",
+    ]
+    return any(signal in text for signal in duplicate_signals)
+
+
+def _normalize_nit(value: str | None) -> str:
+    if not value:
+        return ""
+    digits = re.sub(r"\D", "", value)
+    return digits.lstrip("0") or digits
+
+
+def _extract_contacts(payload):
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        if isinstance(payload.get("data"), list):
+            return payload.get("data")
+        if isinstance(payload.get("results"), list):
+            return payload.get("results")
+    return []
 
 class AlegraService:
     def __init__(self):
@@ -74,15 +110,99 @@ class AlegraService:
             return self._cost_centers
         return []
 
+    async def list_contacts(
+        self,
+        client: httpx.AsyncClient,
+        contact_type: str | None = "provider",
+        start: int = 0,
+        limit: int = 30,
+    ):
+        params = {}
+        if contact_type:
+            params["type"] = contact_type
+        safe_limit = max(1, min(int(limit), 30))
+        safe_start = max(0, int(start))
+        params["start"] = safe_start
+        params["limit"] = safe_limit
+
+        res = await client.get(f"{self.base_url}/contacts", params=params, headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f"Error Alegra API al listar contactos: {res.text}")
+        return _extract_contacts(res.json())
+
+    async def get_contact(self, client: httpx.AsyncClient, contact_id: str):
+        res = await client.get(f"{self.base_url}/contacts/{contact_id}", headers=self.headers)
+        if res.status_code != 200:
+            raise Exception(f"Error Alegra API al consultar contacto {contact_id}: {res.text}")
+        data = res.json()
+        return data.get("data", data) if isinstance(data, dict) else data
+
+    async def create_contact(self, client: httpx.AsyncClient, payload: dict):
+        res = await client.post(f"{self.base_url}/contacts", json=payload, headers=self.headers)
+        if res.status_code not in [200, 201]:
+            raise Exception(f"Error Alegra API al crear contacto: {res.text}")
+        data = res.json()
+        return data.get("data", data) if isinstance(data, dict) else data
+
+    async def update_contact(self, client: httpx.AsyncClient, contact_id: str, payload: dict):
+        res = await client.put(f"{self.base_url}/contacts/{contact_id}", json=payload, headers=self.headers)
+        if res.status_code not in [200, 201]:
+            raise Exception(f"Error Alegra API al actualizar contacto {contact_id}: {res.text}")
+        data = res.json()
+        return data.get("data", data) if isinstance(data, dict) else data
+
+    async def delete_contact(self, client: httpx.AsyncClient, contact_id: str):
+        res = await client.delete(f"{self.base_url}/contacts/{contact_id}", headers=self.headers)
+        if res.status_code not in [200, 202, 204]:
+            raise Exception(f"Error Alegra API al eliminar contacto {contact_id}: {res.text}")
+        return True
+
     async def get_provider_id(self, client: httpx.AsyncClient, nit: str, nombre: str):
-        # 1. Buscar si el proveedor existe
-        res = await client.get(f"{self.base_url}/contacts/?identification={nit}&type=provider", headers=self.headers)
-        if res.status_code == 200:
-            contacts = res.json()
-            if isinstance(contacts, list) and len(contacts) > 0:
-                return contacts[0]["id"]
+        normalized_nit = _normalize_nit(nit)
+
+        async def find_by_identification(value: str | None):
+            if not value:
+                return None
+            res = await client.get(
+                f"{self.base_url}/contacts",
+                params={"identification": value, "type": "provider"},
+                headers=self.headers,
+            )
+            if res.status_code != 200:
+                return None
+            contacts = _extract_contacts(res.json())
+            for contact in contacts:
+                contact_id_number = _normalize_nit(str(contact.get("identification") or ""))
+                if contact_id_number == _normalize_nit(value):
+                    return contact.get("id")
+            if contacts:
+                return contacts[0].get("id")
+            return None
+
+        # 1) Fast path by exact identification with and without leading zeros.
+        provider_id = await find_by_identification(nit)
+        if provider_id:
+            return provider_id
+
+        if normalized_nit != _normalize_nit(nit):
+            provider_id = await find_by_identification(normalized_nit)
+            if provider_id:
+                return provider_id
+
+        # 2) Fallback: list providers and compare normalized identification.
+        fallback_res = await client.get(
+            f"{self.base_url}/contacts",
+            params={"type": "provider"},
+            headers=self.headers,
+        )
+        if fallback_res.status_code == 200:
+            contacts = _extract_contacts(fallback_res.json())
+            for contact in contacts:
+                candidate = _normalize_nit(str(contact.get("identification") or ""))
+                if candidate and candidate == normalized_nit:
+                    return contact.get("id")
         
-        # 2. Si no existe o hubo un error leve al buscarlo, se intenta crear
+        # 3) If it does not exist, try creating provider.
         payload = {
             "name": nombre,
             "identification": nit,
@@ -91,8 +211,19 @@ class AlegraService:
         create_res = await client.post(f"{self.base_url}/contacts", json=payload, headers=self.headers)
         if create_res.status_code in [201, 200]:
             return create_res.json()["id"]
+
+        # 4) If creation failed because it already exists (or equivalent), retry lookup.
+        create_error_text = create_res.text or ""
+        if _is_duplicate_bill_error(create_error_text) or "exists" in create_error_text.lower() or "ya existe" in create_error_text.lower():
+            provider_id = await find_by_identification(nit)
+            if not provider_id and normalized_nit:
+                provider_id = await find_by_identification(normalized_nit)
+            if provider_id:
+                return provider_id
             
-        raise Exception(f"No se pudo encontrar ni crear el proveedor con NIT {nit} en Alegra.")
+        raise Exception(
+            f"No se pudo encontrar ni crear el proveedor con NIT {nit} en Alegra. Detalle: {create_error_text}"
+        )
 
     async def crear_bill(self, factura: FacturaDIAN):
         if not factura.nit_proveedor:
@@ -127,6 +258,9 @@ class AlegraService:
             if res.status_code in [200, 201]:
                 return res.json()
             else:
-                raise Exception(f"Error Alegra API al crear Bill: {res.text}")
+                error_text = res.text
+                if _is_duplicate_bill_error(error_text):
+                    raise AlegraDuplicateBillError("La factura ya fue causada en Alegra (documento duplicado).")
+                raise Exception(f"Error Alegra API al crear Bill: {error_text}")
 
 alegra_service = AlegraService()

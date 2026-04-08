@@ -1,17 +1,19 @@
 import React from 'react';
-import { LayoutDashboard, FileText, Settings, History, Menu, MoonStar, Sun, BellRing, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileText, Settings, History, Users, Menu, MoonStar, Sun, BellRing, PanelLeftClose, PanelLeftOpen, ChevronDown, LogOut } from 'lucide-react';
 
 const icons = {
   LayoutDashboard,
   FileText,
   Settings,
-  History
+  History,
+  Users,
 };
 
 export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse, onClose }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
     { id: 'facturas', label: 'Facturas', icon: 'FileText' },
+    { id: 'contactos', label: 'Contactos', icon: 'Users' },
     { id: 'configuracion', label: 'Cuentas', icon: 'Settings' },
     { id: 'logs', label: 'Auditoría', icon: 'History' },
   ];
@@ -66,6 +68,7 @@ export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLo
   const tabLabel = {
     dashboard: 'Dashboard Ejecutivo',
     facturas: 'Control de Facturas',
+    contactos: 'Contactos Alegra',
     configuracion: 'Mapa de Cuentas',
     logs: 'Centro de Auditoria',
   }
@@ -159,6 +162,7 @@ export const KpiCard = ({ label, value, icon: Icon, color = 'brand' }) => {
 export const StatusBadge = ({ status }) => {
   const styles = {
     pendiente: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
+    pendiente_revision: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
     procesado: 'bg-green-500/10 text-green-500 border-green-500/20',
     error: 'bg-red-500/10 text-red-500 border-red-500/20',
     duplicado: 'bg-gray-500/10 text-gray-400 border-gray-500/20',

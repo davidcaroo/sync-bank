@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Facturas from './pages/Facturas'
 import Configuracion from './pages/Configuracion'
 import Logs from './pages/Logs'
+import Contactos from './pages/Contactos'
 import { useTheme } from './hooks/useTheme'
 import { ToastProvider } from './components/ToastProvider'
 import { getSupabaseUserName, supabase } from './lib/supabase'
@@ -72,6 +73,7 @@ export default function App() {
           <main className="app-content">
             {activeTab === 'dashboard' && <Dashboard />}
             {activeTab === 'facturas' && <Facturas />}
+            {activeTab === 'contactos' && <Contactos />}
             {activeTab === 'configuracion' && <Configuracion />}
             {activeTab === 'logs' && <Logs />}
           </main>

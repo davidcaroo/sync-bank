@@ -5,17 +5,17 @@ import io
 import httpx
 from config import settings
 from services.xml_parser import parse_xml_dian
-from services.supabase_service import log_email, save_factura, get_config_cuenta
+from services.supabase_service import log_email, save_factura, get_config_cuenta, sync_config_proveedor_nombre
 from services.ai_service import clasificar_item
 from services.alegra_service import alegra_service
 
-async def check_emails():
+async def check_emails(search_criteria: str = 'UNSEEN'):
     try:
         mail = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT)
         mail.login(settings.IMAP_USER, settings.IMAP_PASS)
         mail.select("inbox")
 
-        status, messages = mail.search(None, 'UNSEEN')
+        status, messages = mail.search(None, search_criteria)
         print(f"IMAP Search: {status}, found {len(messages[0].split())} messages")
         if status != 'OK':
             return
@@ -56,6 +56,8 @@ async def check_emails():
                 for xml in xmls:
                     try:
                         factura = parse_xml_dian(xml)
+                        sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor)
+                        requires_manual_review = False
                         
                         # AI Classification for each item
                         config = get_config_cuenta(factura.nit_proveedor)
@@ -70,11 +72,29 @@ async def check_emails():
                             else:
                                 # Fallback to AI with real categories and cost centers
                                 classification = await clasificar_item(item.descripcion, categories, cost_centers)
-                                item.cuenta_contable_alegra = classification.get("cuenta_id")
-                                item.centro_costo_alegra = classification.get("centro_costo_id")
+                                confidence = float(classification.get("confianza") or 0.0)
+                                if confidence < settings.AI_CONFIDENCE_THRESHOLD:
+                                    requires_manual_review = True
+                                    item.cuenta_contable_alegra = None
+                                    item.centro_costo_alegra = None
+                                else:
+                                    item.cuenta_contable_alegra = classification.get("cuenta_id")
+                                    item.centro_costo_alegra = classification.get("centro_costo_id")
+
+                        factura_payload = factura.model_dump(exclude={"items"}, mode="json")
+                        # The current DB constraint does not include "pendiente_revision".
+                        # We keep invoice state as "pendiente" and enforce manual confirmation
+                        # later based on missing account assignments on items.
+                        factura_payload["estado"] = "pendiente"
 
                         # Save to Supabase
-                        save_factura(factura.model_dump(exclude={"items"}, mode="json"), [i.model_dump(mode="json") for i in factura.items])
+                        save_result = save_factura(
+                            factura_payload,
+                            [i.model_dump(mode="json") for i in factura.items],
+                        )
+                        if save_result.get("duplicado"):
+                            # logs_email currently allows only known states; keep it as processed.
+                            email_log["estado"] = "procesado"
                         
                     except Exception as e:
                         print(f"Error processing XML: {str(e)}")

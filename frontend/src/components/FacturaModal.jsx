@@ -29,10 +29,18 @@ export default function FacturaModal({
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
             <div className="glass px-4 py-3 rounded-xl">
               <p className="text-gray-400">CUFE</p>
               <p className="font-medium break-all">{factura.cufe || '-'}</p>
+            </div>
+            <div className="glass px-4 py-3 rounded-xl">
+              <p className="text-gray-400">NIT Proveedor</p>
+              <p className="font-medium break-all">{factura.nit_proveedor || '-'}</p>
+            </div>
+            <div className="glass px-4 py-3 rounded-xl">
+              <p className="text-gray-400">NIT Receptor</p>
+              <p className="font-medium break-all">{factura.nit_receptor || '-'}</p>
             </div>
             <div className="glass px-4 py-3 rounded-xl">
               <p className="text-gray-400">Estado</p>
@@ -116,7 +124,7 @@ export default function FacturaModal({
           </div>
           <button
             onClick={onCausar}
-            disabled={loading || factura.estado === 'procesado'}
+            disabled={loading || factura.estado === 'procesado' || factura.estado === 'duplicado'}
             className="btn-primary"
           >
             {loading ? 'Enviando a Alegra...' : 'Causar en Alegra'}

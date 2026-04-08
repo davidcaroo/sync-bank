@@ -9,7 +9,7 @@ last_run = None
 @router.post("/manual")
 async def trigger_manual():
     global last_run
-    await check_emails()
+    await check_emails(search_criteria='ALL')
     last_run = datetime.now()
     return {"status": "success", "timestamp": last_run}
 

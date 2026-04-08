@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Query
 from dateutil import parser as date_parser
 from datetime import datetime
 from pydantic import BaseModel
-from services.supabase_service import supabase, save_causacion
-from services.alegra_service import alegra_service
+from services.supabase_service import supabase, save_causacion, get_successful_causacion
+from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from models.factura import FacturaDIAN, FacturaItem
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
@@ -90,10 +90,50 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
     if not factura_data:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
 
+    if factura_data.get("estado") == "procesado":
+        existing = get_successful_causacion(factura_id)
+        detail = {
+            "message": "Factura ya causada",
+            "code": "FACTURA_YA_CAUSADA",
+            "alegra_bill_id": existing.get("alegra_bill_id") if existing else None,
+        }
+        raise HTTPException(status_code=409, detail=detail)
+
+    existing_success = get_successful_causacion(factura_id)
+    if existing_success:
+        supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Factura ya fue causada previamente",
+                "code": "FACTURA_YA_CAUSADA",
+                "alegra_bill_id": existing_success.get("alegra_bill_id"),
+            },
+        )
+
     overrides_map = {}
     if payload and payload.item_overrides:
         for item in payload.item_overrides:
             overrides_map[str(item.item_id)] = item
+
+    missing_confirmation = []
+    for item in factura_data.get("items_factura", []) or []:
+        override = overrides_map.get(str(item.get("id")))
+        cuenta_actual = item.get("cuenta_contable_alegra")
+        cuenta_override = override.cuenta_contable_alegra if override else None
+        effective_cuenta = cuenta_override if cuenta_override is not None else cuenta_actual
+        if not effective_cuenta:
+            missing_confirmation.append(str(item.get("id")))
+
+    if missing_confirmation:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Factura en revision manual: confirma cuenta por item antes de causar",
+                "code": "REQUIERE_CONFIRMACION_MANUAL",
+                "missing_item_ids": missing_confirmation,
+            },
+        )
 
     items = []
     for item in factura_data.get("items_factura", []) or []:
@@ -154,6 +194,24 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
             "error_msg": None,
         })
         return alegra_response
+    except AlegraDuplicateBillError as exc:
+        supabase.table("facturas").update({"estado": "duplicado"}).eq("id", factura_id).execute()
+        save_causacion({
+            "factura_id": factura_id,
+            "alegra_bill_id": None,
+            "alegra_response": {"error": str(exc), "code": "DUPLICADO_ALEGRA"},
+            "estado": "duplicado",
+            "intentos": 1,
+            "error_msg": str(exc),
+        })
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": str(exc),
+                "code": "DUPLICADO_ALEGRA",
+                "alegra_bill_id": None,
+            },
+        )
     except Exception as exc:
         supabase.table("facturas").update({"estado": "error"}).eq("id", factura_id).execute()
         save_causacion({

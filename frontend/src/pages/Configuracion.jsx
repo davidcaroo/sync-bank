@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Building2, Landmark, Plus, Save, Trash2 } from 'lucide-react'
 import DataTable from '../components/DataTable'
+import ConfirmDialog from '../components/ConfirmDialog'
 import {
   createConfigCuenta,
   deleteConfigCuenta,
@@ -23,6 +24,7 @@ const emptyForm = {
 
 export default function Configuracion() {
   const toast = useToast()
+  const formCardRef = useRef(null)
   const [data, setData] = useState([])
   const [catalogo, setCatalogo] = useState({ categories: [], cost_centers: [] })
   const [form, setForm] = useState(emptyForm)
@@ -30,6 +32,8 @@ export default function Configuracion() {
   const [loading, setLoading] = useState(false)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const fetchData = async () => {
     if (!isApiConfigured) {
@@ -128,6 +132,8 @@ export default function Configuracion() {
       id_reteiva: row.id_reteiva || '',
       activo: row.activo ?? true,
     })
+    formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    toast.info(`Editando mapeo para NIT ${row.nit_proveedor}.`)
   }
 
   const handleToggle = async (row) => {
@@ -141,17 +147,32 @@ export default function Configuracion() {
   }
 
   const handleDelete = async (row) => {
+    setDeleteTarget(row)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteLoading(true)
     try {
-      await deleteConfigCuenta(row.id)
+      await deleteConfigCuenta(deleteTarget.id)
       await fetchData()
+      toast.success('Registro eliminado correctamente.')
     } catch (err) {
       setError('No se pudo eliminar el registro.')
       toast.error('No se pudo eliminar el registro seleccionado.')
+    } finally {
+      setDeleteLoading(false)
+      setDeleteTarget(null)
     }
   }
 
   const columns = [
     { key: 'nit_proveedor', label: 'NIT Proveedor' },
+    {
+      key: 'nombre_proveedor',
+      label: 'Proveedor',
+      render: (row) => row.nombre_proveedor || '-',
+    },
     { key: 'nombre_cuenta', label: 'Cuenta' },
     { key: 'id_cuenta_alegra', label: 'ID Alegra' },
     {
@@ -204,7 +225,7 @@ export default function Configuracion() {
         <p className="text-gray-400 mt-1">Mapeo NIT a cuentas contables en Alegra.</p>
       </div>
 
-      <div className="panel-card p-6 space-y-4">
+      <div ref={formCardRef} className="panel-card p-6 space-y-4">
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <Plus size={16} />
           <span>{editingId ? 'Editar registro' : 'Nuevo registro'}</span>
@@ -367,6 +388,21 @@ export default function Configuracion() {
         data={data}
         loading={loading}
         emptyLabel="No hay cuentas configuradas."
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Confirmar eliminacion"
+        message={
+          deleteTarget
+            ? `Vas a eliminar la configuracion del NIT ${deleteTarget.nit_proveedor}. Esta accion no se puede deshacer.`
+            : ''
+        }
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        loading={deleteLoading}
       />
     </div>
   )
