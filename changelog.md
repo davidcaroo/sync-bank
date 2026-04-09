@@ -1,5 +1,101 @@
 # Changelog
 
+## [2026-04-09] - Exactitud Monetaria de Facturas DIAN y Corrección de Total Real
+### Contexto
+- Se detectó una diferencia operativa entre el valor mostrado en el sistema y el valor real pagadero del documento en proveedores con retenciones.
+- Caso de referencia validado: factura `ALTX17971` (ALMARTEX ASOCIADOS S.A.S.), donde el sistema mostraba el bruto y el soporte requería reflejar el neto pagadero.
+
+### Corregido
+- **Cálculo del total real pagadero**: se robusteció el parser DIAN para evitar mostrar como total final un valor bruto cuando el XML reporta retenciones en bloques separados.
+- **Consistencia visual en toda la app**: se dejó de mostrar el total bruto como principal en Dashboard y Facturas; ahora se prioriza el total neto pagadero.
+- **Recuperación de exactitud en registros históricos**: al consultar facturas, el backend recalcula campos monetarios desde `xml_raw` cuando está disponible, para corregir visualización sin esperar reprocesamiento masivo inicial.
+
+### Añadido
+- **Parser monetario robusto en XML** (`backend/services/xml_parser.py`):
+	- Normalizador numérico seguro para conversiones (`_to_float`).
+	- Lectura de montos UBL relevantes:
+		- `LineExtensionAmount` (subtotal)
+		- `TaxInclusiveAmount` (bruto con impuestos)
+		- `PayableAmount` (pagadero)
+		- `AllowanceTotalAmount` (descuentos globales)
+		- `ChargeTotalAmount` (cargos globales)
+		- `PrepaidAmount` (anticipos)
+		- `PayableRoundingAmount` / `RoundingAmount` (redondeo)
+	- Extracción de retenciones desde `WithholdingTaxTotal`, con clasificación por tipo cuando el proveedor lo informa (fuente, ICA, IVA).
+	- Regla de fallback para proveedores que reportan `PayableAmount` como bruto y las retenciones por fuera: se calcula neto con componentes y se toma como total final.
+	- Enriquecimiento por ítem:
+		- `descuento` por línea (`AllowanceCharge` con `ChargeIndicator=false`)
+		- `iva_porcentaje` por línea (`TaxCategory/Percent`)
+
+- **Preview de ingesta con trazabilidad monetaria** (`backend/services/ingestion_service.py`):
+	- Nuevos campos por factura:
+		- `rete_fuente`, `rete_ica`, `rete_iva`
+		- `total_bruto`
+		- `total_retenciones`
+		- `total_neto`
+	- Nuevos campos por ítem en preview:
+		- `descuento`
+		- `iva_porcentaje`
+
+- **Normalización de respuesta en API de facturas** (`backend/routers/facturas.py`):
+	- Nuevo helper interno `_enrich_factura_monetary_fields` para recalcular y devolver estructura monetaria coherente.
+	- Aplicado tanto a:
+		- `GET /api/facturas`
+		- `GET /api/facturas/{factura_id}`
+
+- **Migraciones SQL preparadas para persistencia extendida**:
+	- `supabase/003_facturas_totales_exactos.sql`
+		- columnas de auditoría y exactitud: `cargos_adicionales`, `anticipos`, `redondeo`, `total_calculado`, `diferencia_centavos`, `validacion_total`, `parsed_version`, `calculo_exacto`
+		- índices para consulta operativa
+	- `supabase/004_items_factura_descuentos_iva.sql`
+		- asegura columnas `descuento` e `iva_porcentaje` en `items_factura`
+
+### Mejorado
+- **Dashboard** (`frontend/src/pages/Dashboard.jsx`):
+	- Cambio de encabezado a `Total a pagar`.
+	- Render principal con `total_neto` (fallback a `total`).
+
+- **Módulo Facturas** (`frontend/src/pages/Facturas.jsx`):
+	- Cambio de encabezado de columna a `Total a pagar`.
+	- Render principal con `total_neto` (fallback a `total`).
+
+- **Modal de factura** (`frontend/src/components/FacturaModal.jsx`):
+	- Campo principal renombrado a `Total a pagar`.
+	- Sección nueva `Desglose monetario` con:
+		- subtotal
+		- IVA
+		- total bruto
+		- retefuente
+		- reteICA
+		- reteIVA
+		- total retenciones
+		- total neto
+
+### Validación operativa realizada
+- **Despliegue Docker actualizado**:
+	- `docker compose up -d --build` ejecutado sobre backend, frontend y ai-service.
+	- Servicios confirmados arriba en puertos esperados (`8000`, `3000`, `8001`).
+
+- **Prueba de API post-despliegue (factura real)**:
+	- Factura `ALTX17971` retornó:
+		- `total_bruto`: `1.200.906,35`
+		- `total_retenciones`: `25.229,13`
+		- `total_neto`: `1.175.677,22`
+	- Resultado alineado con expectativa de neto pagadero del soporte.
+
+### Compatibilidad y decisiones
+- Se priorizó un enfoque **no disruptivo** en primera entrega:
+	- corrección inmediata de visualización desde API (incluyendo históricos con `xml_raw`)
+	- migraciones listas para endurecer persistencia sin bloquear operación actual
+- No se cambió la semántica funcional de causación en Alegra en esta iteración; el alcance fue precisión monetaria y transparencia de datos.
+
+### Próximos pasos recomendados
+- Ejecutar en Supabase SQL Editor:
+	- `supabase/003_facturas_totales_exactos.sql`
+	- `supabase/004_items_factura_descuentos_iva.sql`
+- Realizar validación de muestra ampliada con múltiples proveedores y estructuras XML (con y sin retenciones/cargos/descuentos).
+- Definir política formal de tolerancia (`diferencia_centavos`) para alertado o bloqueo de causación en futuras fases.
+
 ## [2026-04-08] - Limpieza de UI Operativa y Veracidad de Datos en Dashboard
 ### Corregido
 - **Eliminación de componentes con datos ficticios**: Se retiraron del dashboard los bloques visuales heredados de plantilla (`Earnings Overview`, `Revenue Sources`, `Projects`) que mostraban valores no conectados al backend.

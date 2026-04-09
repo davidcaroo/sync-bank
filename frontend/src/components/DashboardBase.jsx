@@ -15,6 +15,8 @@ import {
   LogOut,
 } from 'lucide-react';
 
+import logoIcon from '../assets/icono-blanco.png';
+
 const icons = { LayoutDashboard, FileText, Settings, History, Users };
 
 /* ================================================================
@@ -40,11 +42,31 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse
 
       <aside className={`app-sidebar${isOpen ? ' show' : ''}${collapsed ? ' collapsed' : ''}`}>
         {/* Brand */}
-        <div className="sidebar-brand-wrap">
-          <h1 className="sidebar-brand-title">
-            {collapsed ? 'SB' : 'Sync-bank'}
-          </h1>
-          <p className="sidebar-brand-subtitle">Automation Finance Suite</p>
+        <div className="sidebar-brand-wrap" style={collapsed ? { minWidth: 'auto', padding: '1rem 0' } : { padding: '1.25rem 1rem' }}>
+          {collapsed ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+              <img 
+                src={logoIcon} 
+                alt="Logo" 
+                style={{ width: '30px', height: '30px', objectFit: 'contain', display: 'block' }} 
+              />
+              <span style={{ fontSize: '0.62rem', fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '0.01em', textAlign: 'center' }}>
+                Sync-bank
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%' }}>
+              <img 
+                src={logoIcon} 
+                alt="Logo" 
+                style={{ width: '32px', height: '32px', objectFit: 'contain', flexShrink: 0 }} 
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <h1 className="sidebar-brand-title" style={{ margin: 0, fontSize: '1.25rem' }}>Sync-bank</h1>
+                <p className="sidebar-brand-subtitle" style={{ margin: 0, opacity: 0.8 }}>Automation Finance Suite</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Nav links */}

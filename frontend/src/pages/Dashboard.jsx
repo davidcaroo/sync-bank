@@ -159,7 +159,7 @@ export default function Dashboard() {
                 <th>Factura</th>
                 <th>Proveedor</th>
                 <th className="d-none-mobile">NIT</th>
-                <th>Total</th>
+                <th>Total a pagar</th>
                 <th>Estado</th>
                 <th className="d-none-mobile">Fecha</th>
               </tr>
@@ -170,7 +170,7 @@ export default function Dashboard() {
                   <td className="fw-bold">{f.numero_factura}</td>
                   <td>{f.nombre_proveedor}</td>
                   <td className="d-none-mobile text-muted">{f.nit_proveedor || '—'}</td>
-                  <td className="fw-bold">${parseFloat(f.total || 0).toLocaleString('es-CO')}</td>
+                  <td className="fw-bold">${parseFloat(f.total_neto || f.total || 0).toLocaleString('es-CO')}</td>
                   <td><StatusBadge status={f.estado} /></td>
                   <td className="d-none-mobile text-muted">
                     {new Date(f.created_at).toLocaleDateString('es-CO', {

@@ -361,7 +361,7 @@ export default function Facturas() {
                 <th>Factura</th>
                 <th>Proveedor</th>
                 <th className="d-none-mobile">NIT</th>
-                <th>Total</th>
+                <th>Total a pagar</th>
                 <th>Estado</th>
                 <th className="d-none-mobile">Fecha</th>
               </tr>
@@ -391,7 +391,7 @@ export default function Facturas() {
                   </td>
                   <td>{row.nombre_proveedor}</td>
                   <td className="d-none-mobile text-muted">{row.nit_proveedor || '—'}</td>
-                  <td className="fw-bold">${Number(row.total || 0).toLocaleString('es-CO')}</td>
+                  <td className="fw-bold">${Number(row.total_neto || row.total || 0).toLocaleString('es-CO')}</td>
                   <td><StatusBadge status={row.estado} /></td>
                   <td className="d-none-mobile text-muted">
                     {new Date(row.created_at).toLocaleDateString('es-CO', {

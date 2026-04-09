@@ -40,6 +40,37 @@ def _extract_contacts(payload):
             return payload.get("results")
     return []
 
+
+def _build_bill_observations(factura: FacturaDIAN, max_length: int = 500) -> str:
+    concepts: list[str] = []
+    seen: set[str] = set()
+
+    for item in factura.items or []:
+        raw_desc = (item.descripcion or "").strip()
+        if not raw_desc:
+            continue
+        normalized_desc = re.sub(r"\s+", " ", raw_desc)
+        key = normalized_desc.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        concepts.append(normalized_desc)
+
+    if concepts:
+        concept_text = "; ".join(concepts)
+    else:
+        concept_text = "Sin detalle de items"
+
+    footer = f"Factura DIAN {factura.numero_factura or ''} | CUFE {factura.cufe or 'N/A'}"
+    text = f"Concepto: {concept_text}. {footer}".strip()
+    if len(text) <= max_length:
+        return text
+
+    reserved = len(footer) + len("Concepto: . ")
+    available_for_concepts = max(20, max_length - reserved)
+    clipped_concepts = concept_text[: available_for_concepts - 3].rstrip() + "..."
+    return f"Concepto: {clipped_concepts}. {footer}"[:max_length]
+
 class AlegraService:
     def __init__(self):
         auth_str = f"{settings.ALEGRA_EMAIL}:{settings.ALEGRA_TOKEN}"
@@ -268,7 +299,7 @@ class AlegraService:
                         for item in factura.items
                     ]
                 },
-                "observations": f"Factura DIAN {factura.numero_factura or ''} - CUFE {factura.cufe or 'N/A'}"[:500],
+                "observations": _build_bill_observations(factura),
             }
 
             res = await client.post(f"{self.base_url}/bills", json=payload, headers=self.headers)

@@ -14,6 +14,14 @@ export default function FacturaModal({
   if (!factura) return null
 
   const items = factura.items_factura || factura.items || []
+  const subtotal = Number(factura.subtotal || 0)
+  const iva = Number(factura.iva || 0)
+  const reteFuente = Number(factura.rete_fuente || 0)
+  const reteIca = Number(factura.rete_ica || 0)
+  const reteIva = Number(factura.rete_iva || 0)
+  const totalBruto = Number(factura.total_bruto || subtotal + iva)
+  const totalRetenciones = Number(factura.total_retenciones || reteFuente + reteIca + reteIva)
+  const totalNeto = Number(factura.total_neto || factura.total || 0)
 
   return (
     <div
@@ -70,10 +78,34 @@ export default function FacturaModal({
               </div>
             </div>
             <div className="meta-item">
-              <p className="meta-label">Total</p>
+              <p className="meta-label">Total a pagar</p>
               <p className="meta-value" style={{ color: 'var(--accent)' }}>
-                ${Number(factura.total || 0).toLocaleString('es-CO')}
+                ${totalNeto.toLocaleString('es-CO')}
               </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: '0.85rem',
+              border: '1px solid var(--border)',
+              borderRadius: '0.375rem',
+              padding: '0.75rem 0.85rem',
+              background: 'var(--panel-soft)',
+            }}
+          >
+            <p className="text-xs text-muted fw-bold" style={{ marginBottom: '0.55rem' }}>
+              Desglose monetario
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.4rem 0.8rem' }}>
+              <div className="text-sm"><span className="text-muted">Subtotal:</span> <strong>${subtotal.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">IVA:</span> <strong>${iva.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">Total bruto:</span> <strong>${totalBruto.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">ReteFuente:</span> <strong>${reteFuente.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">ReteICA:</span> <strong>${reteIca.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">ReteIVA:</span> <strong>${reteIva.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">Total retenciones:</span> <strong>${totalRetenciones.toLocaleString('es-CO')}</strong></div>
+              <div className="text-sm"><span className="text-muted">Total neto:</span> <strong style={{ color: 'var(--accent)' }}>${totalNeto.toLocaleString('es-CO')}</strong></div>
             </div>
           </div>
 

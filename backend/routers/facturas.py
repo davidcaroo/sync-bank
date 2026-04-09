@@ -6,6 +6,7 @@ import httpx
 from services.supabase_service import supabase, save_causacion, get_successful_causacion
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from services.ingestion_service import ingestion_service
+from services.xml_parser import parse_xml_dian
 from models.factura import FacturaDIAN, FacturaItem
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
@@ -19,6 +20,43 @@ class ItemOverride(BaseModel):
 
 class CausarFacturaRequest(BaseModel):
     item_overrides: list[ItemOverride] = []
+
+
+def _enrich_factura_monetary_fields(factura: dict) -> dict:
+    if not factura:
+        return factura
+
+    subtotal = float(factura.get("subtotal") or 0)
+    iva = float(factura.get("iva") or 0)
+    rete_fuente = float(factura.get("rete_fuente") or 0)
+    rete_ica = float(factura.get("rete_ica") or 0)
+    rete_iva = float(factura.get("rete_iva") or 0)
+    total_stored = float(factura.get("total") or 0)
+
+    xml_raw = factura.get("xml_raw")
+    if xml_raw:
+        try:
+            parsed = parse_xml_dian(xml_raw)
+            subtotal = float(parsed.subtotal or 0)
+            iva = float(parsed.iva or 0)
+            rete_fuente = float(parsed.rete_fuente or 0)
+            rete_ica = float(parsed.rete_ica or 0)
+            rete_iva = float(parsed.rete_iva or 0)
+            total_stored = float(parsed.total or total_stored)
+        except Exception:
+            pass
+
+    factura["subtotal"] = subtotal
+    factura["iva"] = iva
+    factura["rete_fuente"] = rete_fuente
+    factura["rete_ica"] = rete_ica
+    factura["rete_iva"] = rete_iva
+    factura["total_bruto"] = subtotal + iva
+    factura["total_retenciones"] = rete_fuente + rete_ica + rete_iva
+    factura["total_neto"] = total_stored
+    factura["total"] = total_stored
+
+    return factura
 
 
 def _preview_summary(results: list[dict], *, total_files: int, total_xml: int) -> dict:
@@ -155,8 +193,10 @@ async def get_facturas(
     end = start + page_size - 1
 
     res = query.order("created_at", desc=True).range(start, end).execute()
+    rows = res.data or []
+    rows = [_enrich_factura_monetary_fields(row) for row in rows]
     return {
-        "data": res.data or [],
+        "data": rows,
         "count": res.count or 0,
         "page": page,
         "page_size": page_size,
@@ -167,7 +207,7 @@ async def get_factura(factura_id: str):
     res = supabase.table("facturas").select("*, items_factura(*)").eq("id", factura_id).single().execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
-    return res.data
+    return _enrich_factura_monetary_fields(res.data)
 
 @router.post("/{factura_id}/causar")
 async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None = None):
