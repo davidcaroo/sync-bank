@@ -455,7 +455,7 @@ export default function Configuracion() {
                   <td colSpan={6}>
                     <div className="table-empty">
                       <div className="table-empty-icon" style={{ opacity: 0.2 }}>
-                        <IconArchive size={48} />
+                        <Landmark size={48} />
                       </div>
                       <p className="fw-bold">No hay mapeos configurados</p>
                       <p className="text-sm text-muted mt-1">Crea el primer mapeo en el formulario superior.</p>
