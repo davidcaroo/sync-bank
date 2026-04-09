@@ -116,10 +116,13 @@ class AlegraService:
         contact_type: str | None = "provider",
         start: int = 0,
         limit: int = 30,
+        identification: str | None = None,
     ):
         params = {}
         if contact_type:
             params["type"] = contact_type
+        if identification:
+            params["identification"] = identification
         safe_limit = max(1, min(int(limit), 30))
         safe_start = max(0, int(start))
         params["start"] = safe_start
@@ -157,7 +160,7 @@ class AlegraService:
             raise Exception(f"Error Alegra API al eliminar contacto {contact_id}: {res.text}")
         return True
 
-    async def get_provider_id(self, client: httpx.AsyncClient, nit: str, nombre: str):
+    async def resolve_provider_contact(self, client: httpx.AsyncClient, nit: str, nombre: str) -> dict:
         normalized_nit = _normalize_nit(nit)
 
         async def find_by_identification(value: str | None):
@@ -174,20 +177,20 @@ class AlegraService:
             for contact in contacts:
                 contact_id_number = _normalize_nit(str(contact.get("identification") or ""))
                 if contact_id_number == _normalize_nit(value):
-                    return contact.get("id")
+                    return contact
             if contacts:
-                return contacts[0].get("id")
+                return contacts[0]
             return None
 
         # 1) Fast path by exact identification with and without leading zeros.
-        provider_id = await find_by_identification(nit)
-        if provider_id:
-            return provider_id
+        provider = await find_by_identification(nit)
+        if provider:
+            return provider
 
         if normalized_nit != _normalize_nit(nit):
-            provider_id = await find_by_identification(normalized_nit)
-            if provider_id:
-                return provider_id
+            provider = await find_by_identification(normalized_nit)
+            if provider:
+                return provider
 
         # 2) Fallback: list providers and compare normalized identification.
         fallback_res = await client.get(
@@ -200,8 +203,8 @@ class AlegraService:
             for contact in contacts:
                 candidate = _normalize_nit(str(contact.get("identification") or ""))
                 if candidate and candidate == normalized_nit:
-                    return contact.get("id")
-        
+                    return contact
+
         # 3) If it does not exist, try creating provider.
         payload = {
             "name": nombre,
@@ -210,20 +213,29 @@ class AlegraService:
         }
         create_res = await client.post(f"{self.base_url}/contacts", json=payload, headers=self.headers)
         if create_res.status_code in [201, 200]:
-            return create_res.json()["id"]
+            created = create_res.json()
+            if isinstance(created, dict):
+                return created.get("data", created)
 
         # 4) If creation failed because it already exists (or equivalent), retry lookup.
         create_error_text = create_res.text or ""
         if _is_duplicate_bill_error(create_error_text) or "exists" in create_error_text.lower() or "ya existe" in create_error_text.lower():
-            provider_id = await find_by_identification(nit)
-            if not provider_id and normalized_nit:
-                provider_id = await find_by_identification(normalized_nit)
-            if provider_id:
-                return provider_id
-            
+            provider = await find_by_identification(nit)
+            if not provider and normalized_nit:
+                provider = await find_by_identification(normalized_nit)
+            if provider:
+                return provider
+
         raise Exception(
             f"No se pudo encontrar ni crear el proveedor con NIT {nit} en Alegra. Detalle: {create_error_text}"
         )
+
+    async def get_provider_id(self, client: httpx.AsyncClient, nit: str, nombre: str):
+        provider = await self.resolve_provider_contact(client, nit, nombre)
+        provider_id = provider.get("id") if isinstance(provider, dict) else None
+        if provider_id is None:
+            raise Exception(f"No se pudo resolver id de proveedor en Alegra para NIT {nit}.")
+        return provider_id
 
     async def crear_bill(self, factura: FacturaDIAN):
         if not factura.nit_proveedor:

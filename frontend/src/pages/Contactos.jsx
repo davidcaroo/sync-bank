@@ -11,13 +11,48 @@ import {
 } from '../lib/api'
 import { useToast } from '../components/ToastProvider'
 
+const identificationTypeOptions = [
+  { value: 'NIT', label: 'NIT - Numero de identificacion tributaria' },
+  { value: 'CC', label: 'CC - Cedula de ciudadania' },
+  { value: 'NIT de otro pais', label: 'NIT de otro pais - NIT de otro pais' },
+  { value: 'PP', label: 'PP - Pasaporte' },
+  { value: 'PEP', label: 'PEP - Permiso especial de permanencia' },
+  { value: 'DIE', label: 'DIE - Documento de identificacion extranjero' },
+  { value: 'CE', label: 'CE - Cedula de extranjeria' },
+  { value: 'TE', label: 'TE - Tarjeta de extranjeria' },
+  { value: 'TI', label: 'TI - Tarjeta de identidad' },
+  { value: 'RC', label: 'RC - Registro civil' },
+  { value: 'NUIP', label: 'NUIP - Numero unico de identificacion personal' },
+]
+
+const regimeOptions = [
+  { value: 'Responsable de IVA', label: 'Responsable de IVA' },
+  { value: 'No responsable de IVA', label: 'No responsable de IVA' },
+  { value: 'Impuesto Nacional al Consumo - INC', label: 'Impuesto Nacional al Consumo - INC' },
+  { value: 'No responsable de INC', label: 'No responsable de INC' },
+  { value: 'Responsable de IVA e INC', label: 'Responsable de IVA e INC' },
+  { value: 'Regimen especial', label: 'Regimen especial' },
+]
+
+const normalizeRegimeForForm = (value) => {
+  if (value === 'COMMON_REGIME') return 'Responsable de IVA'
+  if (value === 'SIMPLIFIED_REGIME') return 'No responsable de IVA'
+  return value || 'Responsable de IVA'
+}
+
+const normalizeRegimeForApi = (value) => {
+  if (value === 'Responsable de IVA') return 'COMMON_REGIME'
+  if (value === 'No responsable de IVA') return 'SIMPLIFIED_REGIME'
+  return value
+}
+
 const emptyForm = {
   name: '',
   identification: '',
   identification_type: 'NIT',
   dv: '',
   kind_of_person: 'LEGAL_ENTITY',
-  regime: 'COMMON_REGIME',
+  regime: 'Responsable de IVA',
   department: '',
   city: '',
   address: '',
@@ -131,7 +166,7 @@ export default function Contactos() {
       identification_type: row.identification_type || 'NIT',
       dv: row.dv || '',
       kind_of_person: row.kind_of_person || 'LEGAL_ENTITY',
-      regime: row.regime || 'COMMON_REGIME',
+      regime: normalizeRegimeForForm(row.regime),
       department: row.department || '',
       city: row.city || '',
       address: row.address || '',
@@ -158,10 +193,15 @@ export default function Contactos() {
     setSaving(true)
     setError(null)
     try {
+      const payload = {
+        ...form,
+        regime: normalizeRegimeForApi(form.regime),
+      }
+
       if (editingId) {
-        await updateContacto(editingId, form)
+        await updateContacto(editingId, payload)
       } else {
-        await createContacto(form)
+        await createContacto(payload)
       }
       await fetchData(page)
       closeModal()
@@ -329,20 +369,24 @@ export default function Contactos() {
 
       <div className="panel-card rounded-xl p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative w-full md:max-w-[420px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
-            <input
-              className="input pl-10 h-11"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  setPage(1)
-                  fetchData(1)
-                }
-              }}
-              placeholder="Buscar por nombre, NIT o email"
-            />
+          <div className="w-full md:max-w-[460px]">
+            <div className="h-11 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/70 overflow-hidden flex items-center focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(82,120,255,.16)] transition-all">
+              <div className="w-11 h-full shrink-0 border-r border-[var(--border)]/80 grid place-items-center text-[var(--muted)]">
+                <Search size={15} />
+              </div>
+              <input
+                className="flex-1 h-full bg-transparent px-3 text-sm text-[var(--heading)] placeholder:text-gray-500 focus:outline-none"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    setPage(1)
+                    fetchData(1)
+                  }
+                }}
+                placeholder="Nombre, NIT o correo"
+              />
+            </div>
           </div>
           <div className="min-w-[180px]">
             <select
@@ -471,11 +515,9 @@ export default function Contactos() {
                     value={form.identification_type}
                     onChange={(event) => setForm((prev) => ({ ...prev, identification_type: event.target.value }))}
                   >
-                    <option value="NIT">NIT</option>
-                    <option value="CC">Cedula</option>
-                    <option value="CE">Cedula extranjera</option>
-                    <option value="PP">Pasaporte</option>
-                    <option value="TI">Tarjeta de identidad</option>
+                    {identificationTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -528,8 +570,9 @@ export default function Contactos() {
                     value={form.regime}
                     onChange={(event) => setForm((prev) => ({ ...prev, regime: event.target.value }))}
                   >
-                    <option value="COMMON_REGIME">Responsable de IVA</option>
-                    <option value="SIMPLIFIED_REGIME">No responsable de IVA</option>
+                    {regimeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
 

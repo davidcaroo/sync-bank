@@ -184,11 +184,13 @@ export default function Facturas() {
           </div>
           <div>
             <label className="text-xs text-gray-400">Proveedor</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-3 text-gray-500" />
+            <div className="h-11 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/70 overflow-hidden flex items-center focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(82,120,255,.16)] transition-all">
+              <div className="w-11 h-full shrink-0 border-r border-[var(--border)]/80 grid place-items-center text-[var(--muted)]">
+                <Search size={15} />
+              </div>
               <input
-                className="input pl-9"
-                placeholder="Buscar..."
+                className="flex-1 h-full bg-transparent px-3 text-sm text-[var(--heading)] placeholder:text-gray-500 focus:outline-none"
+                placeholder="Buscar proveedor..."
                 value={filters.proveedor}
                 onChange={(event) => setFilters((prev) => ({ ...prev, proveedor: event.target.value }))}
               />

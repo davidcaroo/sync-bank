@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from dateutil import parser as date_parser
 from datetime import datetime
 from pydantic import BaseModel
+import httpx
 from services.supabase_service import supabase, save_causacion, get_successful_causacion
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from models.factura import FacturaDIAN, FacturaItem
@@ -134,6 +135,27 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
                 "missing_item_ids": missing_confirmation,
             },
         )
+
+    # Best-effort sync: if provider already exists in Alegra for this NIT,
+    # persist the official contact name so UI and accounting views stay consistent.
+    resolved_name = None
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            provider_contact = await alegra_service.resolve_provider_contact(
+                client,
+                factura_data.get("nit_proveedor"),
+                factura_data.get("nombre_proveedor") or "Proveedor Generico",
+            )
+        if isinstance(provider_contact, dict):
+            candidate_name = (provider_contact.get("name") or "").strip()
+            if candidate_name:
+                resolved_name = candidate_name
+    except Exception:
+        resolved_name = None
+
+    if resolved_name and resolved_name != (factura_data.get("nombre_proveedor") or ""):
+        supabase.table("facturas").update({"nombre_proveedor": resolved_name}).eq("id", factura_id).execute()
+        factura_data["nombre_proveedor"] = resolved_name
 
     items = []
     for item in factura_data.get("items_factura", []) or []:

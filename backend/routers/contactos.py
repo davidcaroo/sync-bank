@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 import httpx
+import re
 from services.alegra_service import alegra_service
 
 router = APIRouter(prefix="/contactos", tags=["contactos"])
@@ -139,6 +140,29 @@ async def list_contactos(
 
     if search:
         term = search.lower().strip()
+        numeric_term = re.sub(r"\D", "", term)
+
+        # If the user searches by NIT/identification, run an exact API lookup
+        # independent of current pagination so existing contacts are not missed.
+        if numeric_term:
+            try:
+                async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+                    by_identification = await alegra_service.list_contacts(
+                        client,
+                        resolved_type,
+                        start=0,
+                        limit=30,
+                        identification=numeric_term,
+                    )
+                for contact in by_identification:
+                    item = _normalize_contact(contact)
+                    item_id = str(item.get("id") or "")
+                    if item_id and all(str(existing.get("id") or "") != item_id for existing in normalized):
+                        normalized.append(item)
+            except Exception:
+                # Keep regular filtering path if direct identification lookup fails.
+                pass
+
         normalized = [
             item for item in normalized
             if term in (item.get("name") or "").lower()
@@ -146,6 +170,10 @@ async def list_contactos(
             or term in (item.get("email") or "").lower()
             or term in (item.get("phone_primary") or "").lower()
             or term in (item.get("mobile") or "").lower()
+            or (
+                numeric_term
+                and numeric_term in re.sub(r"\D", "", str(item.get("identification") or ""))
+            )
         ]
 
     return {
