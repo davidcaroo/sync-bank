@@ -9,6 +9,7 @@ services:
       - ./backend:/app
     environment:
       - ENV=dev
+      - TZ=America/Bogota
     env_file:
       - .env
     depends_on:
@@ -23,6 +24,8 @@ services:
       - /app/node_modules
     env_file:
       - .env
+    environment:
+      - TZ=America/Bogota
 
   ai-service:
     build: ./ai-service
@@ -32,9 +35,13 @@ services:
       - ./ai-service:/app
     env_file:
       - .env
+    environment:
+      - TZ=America/Bogota
 
   ollama:
     image: ollama/ollama:latest
+    environment:
+      - TZ=America/Bogota
     volumes:
       - ollama_data:/root/.ollama
 

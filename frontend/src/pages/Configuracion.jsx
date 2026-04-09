@@ -1,5 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Building2, Landmark, Plus, Save, Trash2 } from 'lucide-react'
+import {
+  IconFolder as Building2,
+  IconArchive as Landmark,
+  IconPlus as Plus,
+  IconSave as Save,
+  IconTrash as Trash2,
+  IconRefresh,
+  IconLoading,
+  IconEdit,
+  IconX,
+  IconSearch
+} from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
 import {
   createConfigCuenta,
@@ -143,8 +154,13 @@ export default function Configuracion() {
           className="btn-secondary btn-sm"
           onClick={() => fetchCatalogo(true)}
           disabled={catalogLoading}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          {catalogLoading ? 'Actualizando catálogo…' : '↻ Actualizar catálogo Alegra'}
+          <IconRefresh 
+            size={14} 
+            style={{ animation: catalogLoading ? 'spin 1s linear infinite' : 'none' }} 
+          />
+          {catalogLoading ? 'Actualizando catálogo…' : 'Actualizar catálogo Alegra'}
         </button>
       </div>
 
@@ -158,8 +174,12 @@ export default function Configuracion() {
             {editingId ? 'Editar registro' : 'Nuevo registro'}
           </h2>
           {editingId && (
-            <button className="btn-secondary btn-sm" onClick={resetForm}>
-              ✕ Cancelar edición
+            <button 
+              className="btn-secondary btn-sm" 
+              onClick={resetForm}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <IconX size={14} color="#858796" /> Cancelar edición
             </button>
           )}
         </div>
@@ -382,7 +402,14 @@ export default function Configuracion() {
               {loading && (
                 <tr>
                   <td colSpan={6}>
-                    <div className="table-empty">⏳ Cargando…</div>
+                    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#b7b9cc' }}>
+                      <IconLoading size={48} color="#b7b9cc" style={{
+                        animation: 'spin 1s linear infinite'
+                      }}/>
+                      <p style={{ marginTop: '16px', color: '#858796', fontSize: '0.9rem', fontWeight: 600 }}>
+                        Cargando mapeos...
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -402,12 +429,15 @@ export default function Configuracion() {
                     </button>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                     <div style={{ display: 'flex', gap: '0.35rem' }}>
                       <button
+                        title="Editar"
                         className="btn-secondary btn-sm"
                         onClick={(e) => { e.stopPropagation(); handleEdit(row) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #f6c23e', color: '#f6c23e' }}
                       >
-                        Editar
+                        <IconEdit size={14} />
+                        <span className="d-none-mobile">Editar</span>
                       </button>
                       <button
                         className="btn-danger btn-sm"
@@ -424,7 +454,9 @@ export default function Configuracion() {
                 <tr>
                   <td colSpan={6}>
                     <div className="table-empty">
-                      <div className="table-empty-icon">🗂️</div>
+                      <div className="table-empty-icon" style={{ opacity: 0.2 }}>
+                        <IconArchive size={48} />
+                      </div>
                       <p className="fw-bold">No hay mapeos configurados</p>
                       <p className="text-sm text-muted mt-1">Crea el primer mapeo en el formulario superior.</p>
                     </div>

@@ -1,5 +1,63 @@
 # Changelog
 
+## [2026-04-09] - Estabilidad Operativa: ZIP, Zona Horaria, Duplicados Alegra e Iconos
+### Corregido
+- **Sincronización y carga ZIP robusta**:
+	- Se unificó la extracción XML para carga manual y correo con una sola lógica compartida.
+	- Soporte para ZIP anidados y decodificaciones adicionales (`utf-8-sig`, `utf-16`, `latin-1`).
+	- Cuando un ZIP no contiene XML procesables, ahora se registra y reporta explícitamente en lugar de quedar silencioso.
+
+- **Diagnóstico visible de inválidas**:
+	- El proceso manual de sincronización ahora retorna resumen estructurado (`created`, `duplicates`, `invalid`, `errors`) y detalle de inválidas por archivo/entrada/causa.
+	- Se añadió en Dashboard una sección de resultado de última sincronización con tabla de inválidos para auditoría inmediata.
+
+- **Zona horaria fija a Colombia (`America/Bogota`)**:
+	- Se estandarizó el cálculo de fecha/hora del backend con helper centralizado de zona horaria.
+	- El KPI de "Facturas Hoy" ahora usa fecha local de Bogotá.
+	- Se ajustó `docker-compose.yml` para ejecutar servicios con `TZ=America/Bogota`.
+	- En frontend, el formateo de fechas sensibles se fijó a `America/Bogota`.
+
+- **Facturas duplicadas: enriquecimiento desde Alegra**:
+	- Al consultar detalle de facturas en estado `duplicado`/`procesado`, el backend intenta hidratar cuenta y centro de costo desde la bill existente en Alegra.
+	- Se persisten esos campos en `items_factura` cuando están vacíos localmente.
+	- En el modal de factura, si la cuenta/centro existe pero no aparece en catálogo local, se muestra igualmente como valor "registrado en Alegra" para evitar campos visualmente vacíos.
+
+- **Estabilidad en migración de iconos SVG**:
+	- Se agregaron exports faltantes en la librería de iconos (`IconHistory`, `IconMoonStar`, `IconUserCheck`, `IconUserMinus`) para resolver errores de importación en runtime/build.
+
+### Validación
+- Build de frontend completado exitosamente con Vite tras los ajustes de iconos.
+- Despliegue actualizado con `docker compose up -d --build` sobre todo el stack.
+ 
+## [2026-04-09] - Modernización UI: Iconografía SVG y Eliminación de Emojis
+### Contexto
+- Se identificó una inconsistencia visual por el uso de emojis decorativos y múltiples librerías de iconos (`lucide-react`) mezcladas en la interfaz administrativa.
+- Objetivo: Unificar la línea visual bajo el estándar de **SB Admin 2** usando únicamente componentes SVG inline controlados.
+
+### Añadido
+- **Sistema Unificado de Iconos** (`frontend/src/components/icons/Icons.jsx`):
+	- Creación de una librería de componentes SVG profesionales (`IconSearch`, `IconFilter`, `IconPlus`, `IconRefresh`, `IconHistory`, etc.).
+	- Estándar visual: Grosor de trazo `1.8`, sin relleno, color dinámico via `currentColor`.
+- **Nuevos estados visuales**:
+	- Rediseño de estados de carga (`IconLoading`) con animación `spin` integrada.
+	- Rediseño de estados vacíos (`IconArchive`, `IconInbox`) con opacidad controlada.
+
+### Corregido
+- **Eliminación global de emojis**: Se eliminaron todos los emojis (`⏳`, `📂`, `📄`, `✕`, `📋`, `📭`, `↻`, `🗂️`) del código fuente JSX.
+- **Estandarización de componentes**:
+	- **Facturas**: Reemplazados emojis en carga de archivos, zona Drag & Drop y tablas.
+	- **Auditoría (Logs)**: Reemplazadas flechas de texto (`←`, `→`) por iconos SVG de navegación.
+	- **Dashboard**: Reemplazada iconografía de KPI y estados vacíos.
+	- **Configuración**: Unificación de iconos en botones de edición, guardado y eliminación.
+- **Limpieza de dependencias**: Migración paulatina de `lucide-react` hacia el sistema interno de iconos para reducir la carga de librerías externas.
+
+### Mejorado
+- **Contactos (Directorio)**: 
+	- Rediseño de las **Cards KPI** (Total, Activos, Inactivos) para alinearlas estrictamente al layout de SB Admin 2 (borde lateral de color, fondo blanco, sombra sutil y altura compacta).
+	- Iconografía de alta resolución en el resumen de contactos.
+- **Sidebar y Topbar**: Actualización de todos los iconos de navegación y controles de usuario a la nueva línea visual SVG.
+
+
 ## [2026-04-09] - Exactitud Monetaria de Facturas DIAN y Corrección de Total Real
 ### Contexto
 - Se detectó una diferencia operativa entre el valor mostrado en el sistema y el valor real pagadero del documento en proveedores con retenciones.
@@ -70,6 +128,12 @@
 		- reteIVA
 		- total retenciones
 		- total neto
+
+- **Carga manual DIAN en Facturas** (`frontend/src/pages/Facturas.jsx`):
+	- Se refactorizó la sección de carga (XML/ZIP) de un card embebido a un **modal dedicado**.
+	- Nuevo botón de acceso rápido en el header con estilo visual diferenciado (`Cargar Facturas XML`).
+	- Implementación de zona **Drag & Drop** en el modal para facilitar la selección múltiple de archivos.
+	- Mejor control de UX: cierre automático por `Escape`, clic en fondo y limpieza de estados al cerrar.
 
 ### Validación operativa realizada
 - **Despliegue Docker actualizado**:

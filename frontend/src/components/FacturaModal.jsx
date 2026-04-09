@@ -13,6 +13,8 @@ export default function FacturaModal({
 }) {
   if (!factura) return null
 
+  const facturaEstado = String(factura.estado || '').toLowerCase()
+
   const items = factura.items_factura || factura.items || []
   const subtotal = Number(factura.subtotal || 0)
   const iva = Number(factura.iva || 0)
@@ -151,7 +153,13 @@ export default function FacturaModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {items.map((item) => {
+                    const cuentaActual = item.cuenta_contable_alegra ? String(item.cuenta_contable_alegra) : ''
+                    const centroActual = item.centro_costo_alegra ? String(item.centro_costo_alegra) : ''
+                    const hasCuentaInCatalog = categories.some((cat) => String(cat.id) === cuentaActual)
+                    const hasCentroInCatalog = costCenters.some((cc) => String(cc.id) === centroActual)
+
+                    return (
                     <tr key={item.id || `${item.descripcion}-${item.total_linea}`}>
                       <td style={{ maxWidth: '220px' }}>
                         <span style={{
@@ -171,12 +179,17 @@ export default function FacturaModal({
                         <select
                           className="input"
                           style={{ minWidth: 0, width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem' }}
-                          value={item.cuenta_contable_alegra || ''}
+                          value={cuentaActual}
                           onChange={(e) =>
                             onItemChange?.(item.id, 'cuenta_contable_alegra', e.target.value)
                           }
                         >
                           <option value="">— Cuenta —</option>
+                          {cuentaActual && !hasCuentaInCatalog && (
+                            <option value={cuentaActual}>
+                              {cuentaActual} | (registrada en Alegra)
+                            </option>
+                          )}
                           {categories.map((cat) => (
                             <option key={cat.id} value={cat.id}>
                               {cat.code || cat.id} | {cat.name}
@@ -190,12 +203,17 @@ export default function FacturaModal({
                         <select
                           className="input"
                           style={{ minWidth: 0, width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem' }}
-                          value={item.centro_costo_alegra || ''}
+                          value={centroActual}
                           onChange={(e) =>
                             onItemChange?.(item.id, 'centro_costo_alegra', e.target.value)
                           }
                         >
                           <option value="">Sin centro</option>
+                          {centroActual && !hasCentroInCatalog && (
+                            <option value={centroActual}>
+                              {centroActual} | (registrado en Alegra)
+                            </option>
+                          )}
                           {costCenters.map((cc) => (
                             <option key={cc.id} value={cc.id}>
                               {cc.id} | {cc.name}
@@ -208,7 +226,8 @@ export default function FacturaModal({
                         ${Number(item.total_linea || 0).toLocaleString('es-CO')}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
 
                   {items.length === 0 && (
                     <tr>
@@ -232,15 +251,16 @@ export default function FacturaModal({
               Emisión:
             </span>
             {factura.fecha_emision
-              ? new Date(factura.fecha_emision).toLocaleDateString('es-CO', {
+                ? new Date(factura.fecha_emision).toLocaleDateString('es-CO', {
                   day: '2-digit', month: 'long', year: 'numeric',
+                  timeZone: 'America/Bogota',
                 })
               : '—'}
           </div>
 
           <button
             onClick={onCausar}
-            disabled={loading || factura.estado === 'procesado' || factura.estado === 'causado' || factura.estado === 'duplicado'}
+            disabled={loading || facturaEstado === 'procesado' || facturaEstado === 'causado' || facturaEstado === 'duplicado'}
             className="btn-success"
             id="btn-causar-alegra"
           >

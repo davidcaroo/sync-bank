@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Mail, SlidersHorizontal, X, History } from 'lucide-react'
+import {
+  IconInbox as Mail,
+  IconFilter as SlidersHorizontal,
+  IconX as X,
+  IconHistory as History,
+  IconLoading,
+  IconInbox,
+  IconChevronLeft,
+  IconChevronRight
+} from '../components/icons/Icons'
 import { getLogs, isApiConfigured } from '../lib/api'
 import { useToast } from '../components/ToastProvider'
 
@@ -110,9 +119,13 @@ export default function Logs() {
               {loading && (
                 <tr>
                   <td colSpan={4}>
-                    <div className="table-empty">
-                      <div className="table-empty-icon">⏳</div>
-                      <p className="fw-bold">Cargando registros…</p>
+                    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#b7b9cc' }}>
+                      <IconLoading size={48} color="#b7b9cc" style={{
+                        animation: 'spin 1s linear infinite'
+                      }}/>
+                      <p style={{ marginTop: '16px', color: '#858796', fontSize: '0.9rem', fontWeight: 600 }}>
+                        Cargando registros...
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -143,6 +156,7 @@ export default function Logs() {
                     {new Date(row.created_at).toLocaleString('es-CO', {
                       day: '2-digit', month: 'short', year: 'numeric',
                       hour: '2-digit', minute: '2-digit',
+                      timeZone: 'America/Bogota',
                     })}
                   </td>
                 </tr>
@@ -152,7 +166,9 @@ export default function Logs() {
                 <tr>
                   <td colSpan={4}>
                     <div className="table-empty">
-                      <div className="table-empty-icon">📭</div>
+                      <div className="table-empty-icon" style={{ opacity: 0.2 }}>
+                        <IconInbox size={48} />
+                      </div>
                       <p className="fw-bold">No hay registros para el filtro actual</p>
                       <p className="text-sm text-muted mt-1">
                         {estado ? `No hay emails con estado "${estado}".` : 'Aún no se han procesado emails.'}
@@ -176,15 +192,17 @@ export default function Logs() {
               className="btn-secondary btn-sm"
               disabled={page === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              ← Anterior
+              <IconChevronLeft size={14} /> Anterior
             </button>
             <button
               className="btn-secondary btn-sm"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
-              Siguiente →
+              Siguiente <IconChevronRight size={14} />
             </button>
           </div>
         </div>

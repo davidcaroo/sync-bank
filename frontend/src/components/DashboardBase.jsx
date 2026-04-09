@@ -1,19 +1,21 @@
 import React from 'react';
 import {
-  LayoutDashboard,
-  FileText,
-  Settings,
-  History,
-  Users,
-  Menu,
-  MoonStar,
-  Sun,
-  BellRing,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ChevronDown,
-  LogOut,
-} from 'lucide-react';
+  IconInbox as LayoutDashboard,
+  IconFileText as FileText,
+  IconSettings as Settings,
+  IconHistory as History,
+  IconUsers as Users,
+  IconPlus as Menu, // Fallback if no Menu icon provided, but I'll check Icons.jsx
+  IconRefresh as Sun,
+  IconBell as BellRing,
+  IconChevronLeft as PanelLeftClose,
+  IconChevronRight as PanelLeftOpen,
+  IconChevronRight as ChevronDown,
+  IconMoonStar as MoonStar,
+  IconLogOut as LogOut,
+  IconX,
+  IconLoading
+} from './icons/Icons';
 
 import logoIcon from '../assets/icono-blanco.png';
 

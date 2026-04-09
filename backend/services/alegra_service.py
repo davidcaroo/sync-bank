@@ -1,9 +1,9 @@
 import httpx
 import base64
 import re
-from datetime import datetime
 from config import settings
 from models.factura import FacturaDIAN
+from services.timezone_service import now_bogota
 
 
 class AlegraDuplicateBillError(Exception):
@@ -39,6 +39,83 @@ def _extract_contacts(payload):
         if isinstance(payload.get("results"), list):
             return payload.get("results")
     return []
+
+
+def _extract_list_payload(payload):
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        if isinstance(payload.get("data"), list):
+            return payload.get("data")
+        if isinstance(payload.get("data"), dict):
+            data = payload.get("data")
+            if isinstance(data.get("items"), list):
+                return data.get("items")
+            if isinstance(data.get("results"), list):
+                return data.get("results")
+        if isinstance(payload.get("results"), list):
+            return payload.get("results")
+        if isinstance(payload.get("items"), list):
+            return payload.get("items")
+    return []
+
+
+def _normalize_invoice_ref(value: str | None) -> str:
+    return re.sub(r"\W", "", str(value or "")).lower()
+
+
+def _extract_bill_number(bill: dict) -> str:
+    if not isinstance(bill, dict):
+        return ""
+    number_template = bill.get("numberTemplate")
+    if isinstance(number_template, dict):
+        candidate = str(number_template.get("number") or "").strip()
+        if candidate:
+            return candidate
+    return str(bill.get("number") or "").strip()
+
+
+def _extract_bill_items_accounting(bill: dict) -> list[dict]:
+    if not isinstance(bill, dict):
+        return []
+
+    purchases = bill.get("purchases")
+    if not isinstance(purchases, dict):
+        return []
+
+    categories = purchases.get("categories")
+    if not isinstance(categories, list):
+        return []
+
+    result = []
+    for row in categories:
+        if not isinstance(row, dict):
+            continue
+
+        cuenta = row.get("id")
+        cuenta_value = str(cuenta) if cuenta is not None else None
+
+        cost_center = row.get("costCenter")
+        centro = None
+        if isinstance(cost_center, dict):
+            centro_id = cost_center.get("id")
+            centro = str(centro_id) if centro_id is not None else None
+
+        descripcion = (
+            str(row.get("description") or "").strip()
+            or str(row.get("name") or "").strip()
+            or None
+        )
+
+        result.append(
+            {
+                "descripcion": descripcion,
+                "cuenta_contable_alegra": cuenta_value,
+                "centro_costo_alegra": centro,
+            }
+        )
+
+    return result
 
 
 def _build_bill_observations(factura: FacturaDIAN, max_length: int = 500) -> str:
@@ -261,6 +338,101 @@ class AlegraService:
             f"No se pudo encontrar ni crear el proveedor con NIT {nit} en Alegra. Detalle: {create_error_text}"
         )
 
+    async def find_provider_contact_by_nit(self, client: httpx.AsyncClient, nit: str) -> dict | None:
+        normalized_nit = _normalize_nit(nit)
+        if not normalized_nit:
+            return None
+
+        res = await client.get(
+            f"{self.base_url}/contacts",
+            params={"identification": nit, "type": "provider"},
+            headers=self.headers,
+        )
+        if res.status_code != 200:
+            return None
+
+        contacts = _extract_contacts(res.json())
+        for contact in contacts:
+            candidate = _normalize_nit(str(contact.get("identification") or ""))
+            if candidate == normalized_nit:
+                return contact
+        return contacts[0] if contacts else None
+
+    async def _find_bill_by_number(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        numero_factura: str,
+        provider_id: str | None,
+        max_pages: int = 20,
+    ) -> dict | None:
+        target = _normalize_invoice_ref(numero_factura)
+        if not target:
+            return None
+
+        for page in range(max_pages):
+            params = {
+                "start": page * 30,
+                "limit": 30,
+            }
+            if provider_id:
+                params["provider"] = provider_id
+
+            res = await client.get(f"{self.base_url}/bills", params=params, headers=self.headers)
+            if res.status_code != 200:
+                continue
+
+            bills = _extract_list_payload(res.json())
+            if not bills:
+                break
+
+            for bill in bills:
+                number_raw = _extract_bill_number(bill)
+                number = _normalize_invoice_ref(number_raw)
+                if number == target or number.endswith(target) or target.endswith(number):
+                    return bill
+
+            if len(bills) < 30:
+                break
+
+        return None
+
+    async def get_bill_accounting_by_invoice(
+        self,
+        *,
+        nit_proveedor: str | None,
+        numero_factura: str | None,
+    ) -> dict | None:
+        if not numero_factura:
+            return None
+
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            provider = await self.find_provider_contact_by_nit(client, nit_proveedor or "")
+            provider_id = str(provider.get("id")) if isinstance(provider, dict) and provider.get("id") is not None else None
+
+            bill = await self._find_bill_by_number(
+                client,
+                numero_factura=numero_factura,
+                provider_id=provider_id,
+            )
+
+            if not bill:
+                bill = await self._find_bill_by_number(
+                    client,
+                    numero_factura=numero_factura,
+                    provider_id=None,
+                )
+
+            if not bill:
+                return None
+
+            bill_id = bill.get("id")
+            items = _extract_bill_items_accounting(bill)
+            return {
+                "bill_id": str(bill_id) if bill_id is not None else None,
+                "items": items,
+            }
+
     async def get_provider_id(self, client: httpx.AsyncClient, nit: str, nombre: str):
         provider = await self.resolve_provider_contact(client, nit, nombre)
         provider_id = provider.get("id") if isinstance(provider, dict) else None
@@ -279,10 +451,11 @@ class AlegraService:
         async with httpx.AsyncClient() as client:
             # Primero buscamos el ID interno del proveedor en Alegra
             provider_id = await self.get_provider_id(client, factura.nit_proveedor, factura.nombre_proveedor)
+            now_local = now_bogota()
             
             payload = {
-                "date": factura.fecha_emision.strftime("%Y-%m-%d") if factura.fecha_emision else datetime.utcnow().strftime("%Y-%m-%d"),
-                "dueDate": (factura.fecha_vencimiento or factura.fecha_emision or datetime.utcnow()).strftime("%Y-%m-%d"),
+                "date": factura.fecha_emision.strftime("%Y-%m-%d") if factura.fecha_emision else now_local.strftime("%Y-%m-%d"),
+                "dueDate": (factura.fecha_vencimiento or factura.fecha_emision or now_local).strftime("%Y-%m-%d"),
                 "provider": {"id": provider_id},
                 "numberTemplate": {
                     "number": factura.numero_factura,

@@ -6,6 +6,7 @@ import httpx
 from services.supabase_service import supabase, save_causacion, get_successful_causacion
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from services.ingestion_service import ingestion_service
+from services.timezone_service import BOGOTA_TZ, now_bogota, to_bogota
 from services.xml_parser import parse_xml_dian
 from models.factura import FacturaDIAN, FacturaItem
 
@@ -20,6 +21,81 @@ class ItemOverride(BaseModel):
 
 class CausarFacturaRequest(BaseModel):
     item_overrides: list[ItemOverride] = []
+
+
+async def _hydrate_items_from_alegra_if_needed(factura: dict) -> dict:
+    if not factura:
+        return factura
+
+    estado = (factura.get("estado") or "").strip().lower()
+    if estado not in {"duplicado", "procesado"}:
+        return factura
+
+    items = factura.get("items_factura") or []
+    if not items:
+        return factura
+
+    has_missing_mapping = any(
+        not (item.get("cuenta_contable_alegra") or item.get("centro_costo_alegra"))
+        for item in items
+    )
+    if not has_missing_mapping:
+        return factura
+
+    try:
+        remote = await alegra_service.get_bill_accounting_by_invoice(
+            nit_proveedor=factura.get("nit_proveedor"),
+            numero_factura=factura.get("numero_factura"),
+        )
+    except Exception:
+        return factura
+
+    if not remote:
+        return factura
+
+    remote_items = remote.get("items") or []
+    if not remote_items:
+        return factura
+
+    updated = False
+    for idx, item in enumerate(items):
+        remote_item = None
+        if idx < len(remote_items):
+            remote_item = remote_items[idx]
+        elif len(remote_items) == 1:
+            remote_item = remote_items[0]
+
+        if not remote_item:
+            continue
+
+        current_cuenta = item.get("cuenta_contable_alegra")
+        current_centro = item.get("centro_costo_alegra")
+        new_cuenta = remote_item.get("cuenta_contable_alegra")
+        new_centro = remote_item.get("centro_costo_alegra")
+
+        # Only enrich empty fields to preserve manual overrides done locally.
+        patch = {}
+        if not current_cuenta and new_cuenta:
+            patch["cuenta_contable_alegra"] = new_cuenta
+        if not current_centro and new_centro:
+            patch["centro_costo_alegra"] = new_centro
+
+        if patch:
+            try:
+                supabase.table("items_factura").update(patch).eq("id", item.get("id")).execute()
+            except Exception:
+                continue
+
+            item.update(patch)
+            updated = True
+
+    if updated:
+        factura["items_factura"] = items
+
+    if remote.get("bill_id"):
+        factura["alegra_bill_id"] = remote.get("bill_id")
+
+    return factura
 
 
 def _enrich_factura_monetary_fields(factura: dict) -> dict:
@@ -150,14 +226,19 @@ async def get_facturas_stats():
     causadas = 0
     pendientes = 0
     errores = 0
-    today_str = datetime.utcnow().date().isoformat()
+    today_local = now_bogota().date()
 
     for factura in facturas:
         created_at = factura.get("created_at")
         if created_at:
-            created_date = date_parser.parse(created_at).date().isoformat()
-            if created_date == today_str:
-                hoy += 1
+            try:
+                created_dt = date_parser.parse(created_at)
+                created_local = to_bogota(created_dt)
+                created_local_date = created_local.date() if created_local else None
+                if created_local_date == today_local:
+                    hoy += 1
+            except Exception:
+                pass
 
         estado = factura.get("estado")
         if estado == "procesado":
@@ -207,7 +288,8 @@ async def get_factura(factura_id: str):
     res = supabase.table("facturas").select("*, items_factura(*)").eq("id", factura_id).single().execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
-    return _enrich_factura_monetary_fields(res.data)
+    factura = await _hydrate_items_from_alegra_if_needed(res.data)
+    return _enrich_factura_monetary_fields(factura)
 
 @router.post("/{factura_id}/causar")
 async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None = None):

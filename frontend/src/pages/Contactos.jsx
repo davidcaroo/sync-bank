@@ -1,5 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Filter, Pencil, Plus, RotateCcw, Save, Search, Trash2, UserCheck, UserMinus, Users, X } from 'lucide-react'
+import {
+  IconFilter as Filter,
+  IconEdit as Pencil,
+  IconPlus as Plus,
+  IconRefresh as RotateCcw,
+  IconSave as Save,
+  IconSearch as Search,
+  IconTrash as Trash2,
+  IconUserCheck as UserCheck,
+  IconUserMinus as UserMinus,
+  IconUsers as Users,
+  IconX as X,
+  IconChevronLeft,
+  IconChevronRight
+} from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StatusBadge } from '../components/DashboardBase'
 import {
@@ -303,7 +317,7 @@ export default function Contactos() {
             </div>
           </div>
           <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <Users size={38} strokeWidth={1.5} />
+            <Users size={38} />
           </div>
         </div>
 
@@ -340,7 +354,7 @@ export default function Contactos() {
             </div>
           </div>
           <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <UserCheck size={38} strokeWidth={1.5} />
+            <UserCheck size={38} />
           </div>
         </div>
 
@@ -377,7 +391,7 @@ export default function Contactos() {
             </div>
           </div>
           <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <UserMinus size={38} strokeWidth={1.5} />
+            <UserMinus size={38} />
           </div>
         </div>
       </div>
@@ -531,8 +545,22 @@ export default function Contactos() {
         <div className="table-footer">
            <span className="text-sm text-muted">Mostrando {rows.length} resultados</span>
            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(prev => prev - 1)}>Anterior</button>
-              <button className="btn-secondary btn-sm" disabled={!hasMore} onClick={() => setPage(prev => prev + 1)}>Siguiente</button>
+              <button 
+                className="btn-secondary btn-sm" 
+                disabled={page <= 1} 
+                onClick={() => setPage(prev => prev - 1)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <IconChevronLeft size={14} /> Anterior
+              </button>
+              <button 
+                className="btn-secondary btn-sm" 
+                disabled={!hasMore} 
+                onClick={() => setPage(prev => prev + 1)}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                Siguiente <IconChevronRight size={14} />
+              </button>
            </div>
         </div>
       </div>

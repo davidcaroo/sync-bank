@@ -1,7 +1,7 @@
 from lxml import etree
 from models.factura import FacturaDIAN, FacturaItem
 from dateutil import parser
-from datetime import datetime
+from services.timezone_service import now_bogota
 import re
 
 
@@ -205,9 +205,9 @@ def parse_xml_dian(xml_content: str) -> FacturaDIAN:
 
     # Fallback to current time if date is missing
     try:
-        dt_emision = parser.parse(fecha_emision_raw) if fecha_emision_raw else datetime.now()
+        dt_emision = parser.parse(fecha_emision_raw) if fecha_emision_raw else now_bogota()
     except:
-        dt_emision = datetime.now()
+        dt_emision = now_bogota()
 
     return FacturaDIAN(
         cufe=cufe,
