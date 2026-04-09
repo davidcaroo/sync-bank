@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Filter, Pencil, Plus, RotateCcw, Save, Search, Trash2, UserCheck, UserMinus, Users, X } from 'lucide-react'
-import DataTable from '../components/DataTable'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { StatusBadge, KpiCard } from '../components/DashboardBase'
 import {
   createContacto,
   deleteContacto,
@@ -12,17 +12,17 @@ import {
 import { useToast } from '../components/ToastProvider'
 
 const identificationTypeOptions = [
-  { value: 'NIT', label: 'NIT - Numero de identificacion tributaria' },
-  { value: 'CC', label: 'CC - Cedula de ciudadania' },
-  { value: 'NIT de otro pais', label: 'NIT de otro pais - NIT de otro pais' },
+  { value: 'NIT', label: 'NIT - Número de identificación tributaria' },
+  { value: 'CC', label: 'CC - Cédula de ciudadanía' },
+  { value: 'NIT de otro pais', label: 'NIT de otro país' },
   { value: 'PP', label: 'PP - Pasaporte' },
   { value: 'PEP', label: 'PEP - Permiso especial de permanencia' },
-  { value: 'DIE', label: 'DIE - Documento de identificacion extranjero' },
-  { value: 'CE', label: 'CE - Cedula de extranjeria' },
-  { value: 'TE', label: 'TE - Tarjeta de extranjeria' },
+  { value: 'DIE', label: 'DIE - Documento de identificación extranjero' },
+  { value: 'CE', label: 'CE - Cédula de extranjería' },
+  { value: 'TE', label: 'TE - Tarjeta de extranjería' },
   { value: 'TI', label: 'TI - Tarjeta de identidad' },
   { value: 'RC', label: 'RC - Registro civil' },
-  { value: 'NUIP', label: 'NUIP - Numero unico de identificacion personal' },
+  { value: 'NUIP', label: 'NUIP - Número único de identificación personal' },
 ]
 
 const regimeOptions = [
@@ -84,18 +84,15 @@ export default function Contactos() {
   const pageSize = 30
 
   const kpis = useMemo(() => {
+    const total = rows.length
     const activos = rows.filter((item) => item.status === 'active').length
     const inactivos = rows.filter((item) => item.status === 'inactive').length
-    return {
-      total: rows.length,
-      activos,
-      inactivos,
-    }
+    return { total, activos, inactivos }
   }, [rows])
 
   const fetchData = async (targetPage = page) => {
     if (!isApiConfigured) {
-      setError('VITE_API_URL no esta configurado.')
+      setError('VITE_API_URL no está configurado.')
       return
     }
 
@@ -186,7 +183,7 @@ export default function Contactos() {
     }
 
     if (!form.identification.trim()) {
-      toast.warning('El numero de identificacion es obligatorio.')
+      toast.warning('El número de identificación es obligatorio.')
       return
     }
 
@@ -224,9 +221,6 @@ export default function Contactos() {
       await deleteContacto(deleteTarget.id)
       await fetchData(page)
       toast.success('Contacto eliminado correctamente.')
-      if (String(editingId) === String(deleteTarget.id)) {
-        resetForm()
-      }
     } catch (err) {
       const msg = err?.response?.data?.detail || 'No se pudo eliminar el contacto.'
       setError(msg)
@@ -251,99 +245,48 @@ export default function Contactos() {
     }
   }
 
-  const columns = [
-    { key: 'name', label: 'Nombre' },
-    { key: 'identification', label: 'NIT / Identificacion' },
-    {
-      key: 'phone_primary',
-      label: 'Telefono',
-      render: (row) => row.phone_primary || row.mobile || '-',
-    },
-    {
-      key: 'type',
-      label: 'Tipo',
-      render: (row) => (row.type || []).join(', ') || '-',
-    },
-    {
-      key: 'status',
-      label: 'Estado',
-      render: (row) => (
-        <span className={row.status === 'active' ? 'badge-success' : 'badge-muted'}>
-          {(row.status || 'active').toUpperCase()}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Acciones',
-      render: (row) => (
-        <div className="flex gap-2">
-          <button
-            className="icon-btn"
-            title="Editar"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleEdit(row)
-            }}
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            className="icon-btn"
-            title={row.status === 'active' ? 'Desactivar' : 'Activar'}
-            onClick={(event) => {
-              event.stopPropagation()
-              toggleStatus(row)
-            }}
-          >
-            {row.status === 'active' ? <UserMinus size={14} className="text-orange-500" /> : <UserCheck size={14} className="text-green-500" />}
-          </button>
-          <button
-            className="btn-danger p-0 w-[34px] h-[34px] flex items-center justify-center"
-            title="Eliminar"
-            onClick={(event) => {
-              event.stopPropagation()
-              setDeleteTarget(row)
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ),
-    },
-  ]
-
   const selectedType = (form.contact_type || []).includes('client') ? 'client' : 'provider'
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      {/* ── Page heading ──────────────────────────────────────────── */}
+      <div className="page-heading">
         <div>
-          <h2 className="text-3xl font-bold">Contactos</h2>
-          <p className="text-gray-400 mt-1">Gestion de clientes y proveedores.</p>
+          <h1 className="page-heading-title">Directorio de Contactos</h1>
+          <p className="page-heading-sub">Gestión centralizada de clientes y proveedores</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={openCreateModal}>
+        <button className="btn-primary" onClick={openCreateModal}>
           <Plus size={16} />
           Nuevo contacto
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="panel-card px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-gray-400">Registros visibles</span>
-          <span className="text-lg font-bold text-[var(--heading)]">{kpis.total}</span>
-        </div>
-        <div className="panel-card px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-gray-400">Activos</span>
-          <span className="text-lg font-bold text-[var(--success)]">{kpis.activos}</span>
-        </div>
-        <div className="panel-card px-4 py-3 flex items-center justify-between">
-          <span className="text-sm text-gray-400">Inactivos</span>
-          <span className="text-lg font-bold text-[var(--warning)]">{kpis.inactivos}</span>
-        </div>
+      {error && <div className="ui-alert" role="alert">{error}</div>}
+
+      {/* ── KPI Cards ─────────────────────────────────────────────── */}
+      <div className="kpi-grid">
+        <KpiCard
+          label="Total Visibles"
+          value={kpis.total}
+          icon={Users}
+          color="primary"
+        />
+        <KpiCard
+          label="Contactos Activos"
+          value={kpis.activos}
+          icon={UserCheck}
+          color="success"
+        />
+        <KpiCard
+          label="Contactos Inactivos"
+          value={kpis.inactivos}
+          icon={UserMinus}
+          color="warning"
+        />
       </div>
 
-      <div className="flex gap-4 border-b border-white/5 mb-2">
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border)', marginBottom: '1.5rem', overflowX: 'auto' }}>
         {[
           { id: 'all', label: 'Todos' },
           { id: 'client', label: 'Clientes' },
@@ -351,322 +294,258 @@ export default function Contactos() {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => {
-              setTipo(tab.id)
-              setPage(1)
+            onClick={() => { setTipo(tab.id); setPage(1); }}
+            style={{
+              padding: '0.75rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+              color: tipo === tab.id ? 'var(--accent)' : 'var(--muted)',
+              borderBottom: tipo === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+              background: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap'
             }}
-            className={`pb-3 px-2 text-sm font-semibold transition-colors relative ${
-              tipo === tab.id ? 'text-[var(--heading)]' : 'text-gray-400 hover:text-[var(--heading)]'
-            }`}
           >
             {tab.label}
-            {tipo === tab.id && (
-              <div className="absolute bottom-0 left-0 right-0 h-[3px] rounded-full bg-[var(--accent)]" />
-            )}
           </button>
         ))}
       </div>
 
-      <div className="panel-card rounded-xl p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full md:max-w-[460px]">
-            <div className="h-11 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/70 overflow-hidden flex items-center focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(82,120,255,.16)] transition-all">
-              <div className="w-11 h-full shrink-0 border-r border-[var(--border)]/80 grid place-items-center text-[var(--muted)]">
-                <Search size={15} />
+      {/* ── Filters Card ──────────────────────────────────────────── */}
+      <div className="sb-card">
+        <div className="sb-card-header">
+           <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Search size={14} /> Filtros de búsqueda
+          </h2>
+        </div>
+        <div className="sb-card-body">
+          <div className="filter-row">
+            <div style={{ flex: 2 }}>
+              <label>Búsqueda rápida</label>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                <input
+                  className="input"
+                  style={{ paddingLeft: '2.25rem' }}
+                  placeholder="Nombre, NIT o correo..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (setPage(1), fetchData(1))}
+                />
               </div>
-              <input
-                className="flex-1 h-full bg-transparent px-3 text-sm text-[var(--heading)] placeholder:text-gray-500 focus:outline-none"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    setPage(1)
-                    fetchData(1)
-                  }
-                }}
-                placeholder="Nombre, NIT o correo"
-              />
+            </div>
+            <div>
+              <label>Estado</label>
+              <select className="input" value={estadoFilter} onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }}>
+                <option value="all">Todos</option>
+                <option value="active">Activos</option>
+                <option value="inactive">Inactivos</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.5rem' }}>
+               <button className="btn-primary" onClick={() => { setPage(1); fetchData(1); }}>Buscar</button>
+               <button className="btn-secondary" onClick={() => setShowFilters(!showFilters)}>
+                 <Filter size={14} />
+               </button>
             </div>
           </div>
-          <div className="min-w-[180px]">
-            <select
-              className="input h-11"
-              value={estadoFilter}
-              onChange={(event) => {
-                setEstadoFilter(event.target.value)
-                setPage(1)
-              }}
-            >
-              <option value="all">Estado: Todos</option>
-              <option value="active">Estado: Activos</option>
-              <option value="inactive">Estado: Inactivos</option>
-            </select>
-          </div>
-          <button
-            className={`btn-secondary h-11 flex items-center gap-2 ${showFilters ? 'border-[var(--accent)]' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={16} />
-            Filtros
-          </button>
-          <button
-            className="btn-primary h-11 px-8"
-            onClick={() => {
-              setPage(1)
-              fetchData(1)
-            }}
-          >
-            Buscar
-          </button>
-        </div>
 
-        {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5 animate-in slide-in-from-top-2 duration-300">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Telefono</span>
-              <input
-                className="input h-9 text-sm"
-                placeholder="Filtrar por numero..."
-                value={phoneFilter}
-                onChange={(event) => setPhoneFilter(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    setPage(1)
-                    fetchData(1)
-                  }
-                }}
-              />
+          {showFilters && (
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end' }}>
+               <div>
+                  <label>Teléfono</label>
+                  <input className="input" placeholder="Filtrar por número..." value={phoneFilter} onChange={(e) => setPhoneFilter(e.target.value)} />
+               </div>
+               <div style={{ textAlign: 'right' }}>
+                  <button className="btn-secondary btn-sm" onClick={clearFilters}>
+                    <RotateCcw size={12} /> Limpiar filtros
+                  </button>
+               </div>
             </div>
-            <button
-              className="text-xs text-gray-500 hover:text-[var(--heading)] flex items-center gap-1.5 md:justify-end transition-colors"
-              onClick={clearFilters}
-            >
-              <RotateCcw size={14} />
-              Remover filtros
-            </button>
-          </div>
-        )}
-      </div>
-
-      {error && <div className="ui-alert text-sm">{error}</div>}
-
-      <DataTable
-        columns={columns}
-        data={rows}
-        loading={loading}
-        onRowClick={handleEdit}
-        emptyLabel="No hay contactos para los filtros actuales."
-      />
-
-      <div className="flex items-center justify-between text-sm text-gray-400">
-        <span>Pagina {page} · {rows.length} resultados</span>
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary"
-            disabled={page <= 1 || loading}
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-          >
-            Anterior
-          </button>
-          <button
-            className="btn-secondary"
-            disabled={!hasMore || loading}
-            onClick={() => setPage((prev) => prev + 1)}
-          >
-            Siguiente
-          </button>
+          )}
         </div>
       </div>
 
+      {/* ── Data Table ────────────────────────────────────────────── */}
+      <div className="sb-card">
+        <div className="sb-card-header">
+           <h2 className="sb-card-header-title">Listado de Contactos</h2>
+        </div>
+        <div className="table-responsive">
+          <table className="table-admin">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Identificación</th>
+                <th className="d-none-mobile">Teléfono</th>
+                <th className="d-none-mobile">Tipo</th>
+                <th>Estado</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={6}><div className="table-empty">Cargando contactos...</div></td>
+                </tr>
+              )}
+              {!loading && rows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <div className="fw-bold">{row.name}</div>
+                    <div className="text-xs text-muted d-block d-md-none">{row.identification}</div>
+                  </td>
+                  <td>{row.identification}</td>
+                  <td className="d-none-mobile">{row.phone_primary || row.mobile || '—'}</td>
+                  <td className="d-none-mobile">
+                    {(row.type || []).map(t => (
+                      <span key={t} className="status-badge badge-info" style={{ marginRight: '0.2rem', textTransform: 'capitalize' }}>{t}</span>
+                    ))}
+                  </td>
+                  <td>
+                    <StatusBadge status={row.status === 'active' ? 'procesado' : 'error'} label={row.status} />
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                      <button className="btn-secondary btn-sm p-1" title="Editar" onClick={() => handleEdit(row)}>
+                        <Pencil size={12} />
+                      </button>
+                      <button className="btn-secondary btn-sm p-1" title={row.status === 'active' ? 'Desactivar' : 'Activar'} onClick={() => toggleStatus(row)}>
+                        {row.status === 'active' ? <UserMinus size={12} className="text-warning" /> : <UserCheck size={12} className="text-success" />}
+                      </button>
+                      <button className="btn-danger btn-sm p-1" title="Eliminar" onClick={() => setDeleteTarget(row)}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={6}><div className="table-empty">No se encontraron contactos.</div></td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="table-footer">
+           <span className="text-sm text-muted">Mostrando {rows.length} resultados</span>
+           <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(prev => prev - 1)}>Anterior</button>
+              <button className="btn-secondary btn-sm" disabled={!hasMore} onClick={() => setPage(prev => prev + 1)}>Siguiente</button>
+           </div>
+        </div>
+      </div>
+
+      {/* ── Modal ────────────────────────────────────────────────── */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-4xl rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(30,40,60,.28)] animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+        <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div className="modal-box modal-xl">
+            <div className="modal-header">
               <div>
-                <h3 className="text-xl font-bold text-[var(--heading)]">{editingId ? 'Editar contacto' : 'Nuevo contacto'}</h3>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Formulario principal alineado con Alegra.</p>
+                <h3 className="modal-header-title">{editingId ? 'Editar Contacto' : 'Nuevo Contacto'}</h3>
+                <p className="text-sm text-muted">Asegúrate que los datos coincidan con Alegra</p>
               </div>
-              <button className="icon-btn" onClick={closeModal} aria-label="Cerrar modal">
-                <X size={16} />
-              </button>
+              <button className="icon-btn" onClick={closeModal}><X size={16} /></button>
             </div>
-
-            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="modal-body">
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <button
                   className={selectedType === 'client' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setForm((prev) => ({ ...prev, contact_type: ['client'] }))}
-                >
-                  Cliente
-                </button>
+                  style={{ flex: 1 }}
+                  onClick={() => setForm(prev => ({ ...prev, contact_type: ['client'] }))}
+                >Cliente</button>
                 <button
                   className={selectedType === 'provider' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => setForm((prev) => ({ ...prev, contact_type: ['provider'] }))}
-                >
-                  Proveedor
-                </button>
+                  style={{ flex: 1 }}
+                  onClick={() => setForm(prev => ({ ...prev, contact_type: ['provider'] }))}
+                >Proveedor</button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div className="space-y-1.5 md:col-span-4">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Tipo de identificacion</label>
-                  <select
-                    className="input"
-                    value={form.identification_type}
-                    onChange={(event) => setForm((prev) => ({ ...prev, identification_type: event.target.value }))}
-                  >
-                    {identificationTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                <div className="grid-item" style={{ gridColumn: 'span 2' }}>
+                   <label>Nombre completo o Razón social</label>
+                   <input className="input" placeholder="Ej. Juan Perez o Empresa S.A.S" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
                 </div>
+                <div>
+                   <label>Tipo de identificación</label>
+                   <select className="input" value={form.identification_type} onChange={e => setForm(p => ({ ...p, identification_type: e.target.value }))}>
+                     {identificationTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                   </select>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                   <div style={{ flex: 3 }}>
+                      <label>Número</label>
+                      <input className="input" placeholder="12345678" value={form.identification} onChange={e => setForm(p => ({ ...p, identification: e.target.value }))} />
+                   </div>
+                   <div style={{ flex: 1 }}>
+                      <label>DV</label>
+                      <input className="input" placeholder="0" value={form.dv} onChange={e => setForm(p => ({ ...p, dv: e.target.value }))} />
+                   </div>
+                </div>
+                <div>
+                   <label>Tipo de persona</label>
+                   <select className="input" value={form.kind_of_person} onChange={e => setForm(p => ({ ...p, kind_of_person: e.target.value }))}>
+                      <option value="LEGAL_ENTITY">Persona jurídica</option>
+                      <option value="PERSON_ENTITY">Persona natural</option>
+                   </select>
+                </div>
+                <div>
+                   <label>Responsabilidad tributaria</label>
+                   <select className="input" value={form.regime} onChange={e => setForm(p => ({ ...p, regime: e.target.value }))}>
+                      {regimeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                   </select>
+                </div>
+              </div>
 
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Numero de identificacion</label>
-                  <input
-                    className="input"
-                    placeholder="Numero"
-                    value={form.identification}
-                    onChange={(event) => setForm((prev) => ({ ...prev, identification: event.target.value }))}
-                  />
-                </div>
+              <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                 <div>
+                    <label>Correo electrónico</label>
+                    <input className="input" placeholder="ejemplo@correo.com" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+                 </div>
+                 <div>
+                    <label>Teléfono</label>
+                    <input className="input" placeholder="601-0000000" value={form.phone_primary} onChange={e => setForm(p => ({ ...p, phone_primary: e.target.value }))} />
+                 </div>
+                 <div>
+                    <label>Celular</label>
+                    <input className="input" placeholder="300-0000000" value={form.mobile} onChange={e => setForm(p => ({ ...p, mobile: e.target.value }))} />
+                 </div>
+              </div>
 
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">DV</label>
-                  <input
-                    className="input"
-                    placeholder="DV"
-                    value={form.dv}
-                    onChange={(event) => setForm((prev) => ({ ...prev, dv: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-12">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Razon social o nombre completo</label>
-                  <input
-                    className="input"
-                    placeholder="Nombre completo"
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Tipo de persona</label>
-                  <select
-                    className="input"
-                    value={form.kind_of_person}
-                    onChange={(event) => setForm((prev) => ({ ...prev, kind_of_person: event.target.value }))}
-                  >
-                    <option value="LEGAL_ENTITY">Persona juridica</option>
-                    <option value="PERSON_ENTITY">Persona natural</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Responsabilidad tributaria</label>
-                  <select
-                    className="input"
-                    value={form.regime}
-                    onChange={(event) => setForm((prev) => ({ ...prev, regime: event.target.value }))}
-                  >
-                    {regimeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Municipio / Ciudad</label>
-                  <input
-                    className="input"
-                    placeholder="Ciudad"
-                    value={form.city}
-                    onChange={(event) => setForm((prev) => ({ ...prev, city: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Departamento</label>
-                  <input
-                    className="input"
-                    placeholder="Departamento"
-                    value={form.department}
-                    onChange={(event) => setForm((prev) => ({ ...prev, department: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-8">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Direccion</label>
-                  <input
-                    className="input"
-                    placeholder="Direccion"
-                    value={form.address}
-                    onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-4">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Pais</label>
-                  <input
-                    className="input"
-                    placeholder="Pais"
-                    value={form.country}
-                    onChange={(event) => setForm((prev) => ({ ...prev, country: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-6">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Correo electronico</label>
-                  <input
-                    className="input"
-                    placeholder="ejemplo@email.com"
-                    value={form.email}
-                    onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-3">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Telefono</label>
-                  <input
-                    className="input"
-                    placeholder="Telefono"
-                    value={form.phone_primary}
-                    onChange={(event) => setForm((prev) => ({ ...prev, phone_primary: event.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-1.5 md:col-span-3">
-                  <label className="text-xs text-[var(--muted)] uppercase tracking-wide font-bold">Celular</label>
-                  <input
-                    className="input"
-                    placeholder="Celular"
-                    value={form.mobile}
-                    onChange={(event) => setForm((prev) => ({ ...prev, mobile: event.target.value }))}
-                  />
-                </div>
+              <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                 <div>
+                    <label>Dirección</label>
+                    <input className="input" placeholder="Calle 123 #45-67" value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} />
+                 </div>
+                 <div>
+                    <label>Ciudad</label>
+                    <input className="input" placeholder="Bogotá" value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />
+                 </div>
+                 <div>
+                    <label>Departamento</label>
+                    <input className="input" placeholder="Cundinamarca" value={form.department} onChange={e => setForm(p => ({ ...p, department: e.target.value }))} />
+                 </div>
               </div>
             </div>
-
-            <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--panel-soft)]/30 flex flex-wrap items-center justify-end gap-2">
-              <button className="btn-secondary" onClick={closeModal} disabled={saving}>
-                Cancelar
-              </button>
-              <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
-                <Save size={14} className="inline mr-2" />
-                {saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Crear contacto'}
-              </button>
+            <div className="modal-footer">
+               <button className="btn-secondary" onClick={closeModal} disabled={saving}>Cancelar</button>
+               <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
+                 <Save size={14} /> {saving ? 'Guardando...' : editingId ? 'Guardar Cambios' : 'Crear Contacto'}
+               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Confirm dialog ───────────────────────────────────────── */}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Confirmar eliminacion"
+        title="Confirmar eliminación"
         message={
           deleteTarget
-            ? `Vas a eliminar el contacto ${deleteTarget.name} (${deleteTarget.identification || 'sin identificacion'}).`
+            ? `Vas a eliminar el contacto ${deleteTarget.name}. Esta acción no se puede deshacer.`
             : ''
         }
         confirmLabel="Eliminar"
