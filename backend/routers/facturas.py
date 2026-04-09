@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from dateutil import parser as date_parser
 from datetime import datetime
 from pydantic import BaseModel
 import httpx
 from services.supabase_service import supabase, save_causacion, get_successful_causacion
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
+from services.ingestion_service import ingestion_service
 from models.factura import FacturaDIAN, FacturaItem
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
@@ -18,6 +19,90 @@ class ItemOverride(BaseModel):
 
 class CausarFacturaRequest(BaseModel):
     item_overrides: list[ItemOverride] = []
+
+
+def _preview_summary(results: list[dict], *, total_files: int, total_xml: int) -> dict:
+    return {
+        "total_files": total_files,
+        "total_xml": total_xml,
+        "valid": len([item for item in results if item.get("status") == "valid"]),
+        "invalid": len([item for item in results if item.get("status") == "invalid"]),
+        "duplicates": len([item for item in results if item.get("status") == "duplicate"]),
+    }
+
+
+def _upload_summary(results: list[dict], *, total_files: int, total_xml: int) -> dict:
+    return {
+        "total_files": total_files,
+        "total_xml": total_xml,
+        "created": len([item for item in results if item.get("status") == "created"]),
+        "duplicates": len([item for item in results if item.get("status") == "duplicate"]),
+        "errors": len([item for item in results if item.get("status") in {"error", "invalid"}]),
+    }
+
+
+@router.post("/preview-upload")
+async def preview_upload_facturas(files: list[UploadFile] = File(...), apply_ai: bool = True):
+    if not files:
+        raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
+
+    extracted = await ingestion_service.extract_xml_documents_from_upload(files)
+    documents = extracted.get("documents") or []
+    errors = extracted.get("errors") or []
+
+    prefill_context = await ingestion_service.build_prefill_context(apply_ai=apply_ai)
+
+    results = list(errors)
+    for xml_doc in documents:
+        result = await ingestion_service.process_xml_document(
+            xml_doc,
+            persist=False,
+            apply_ai=apply_ai,
+            categories=prefill_context.get("categories"),
+            cost_centers=prefill_context.get("cost_centers"),
+        )
+        results.append(result)
+
+    return {
+        "summary": _preview_summary(
+            results,
+            total_files=len(files),
+            total_xml=len(documents),
+        ),
+        "files": results,
+    }
+
+
+@router.post("/upload")
+async def upload_facturas(files: list[UploadFile] = File(...), apply_ai: bool = True):
+    if not files:
+        raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
+
+    extracted = await ingestion_service.extract_xml_documents_from_upload(files)
+    documents = extracted.get("documents") or []
+    errors = extracted.get("errors") or []
+
+    prefill_context = await ingestion_service.build_prefill_context(apply_ai=apply_ai)
+
+    results = list(errors)
+    for xml_doc in documents:
+        result = await ingestion_service.process_xml_document(
+            xml_doc,
+            persist=True,
+            apply_ai=apply_ai,
+            categories=prefill_context.get("categories"),
+            cost_centers=prefill_context.get("cost_centers"),
+        )
+        results.append(result)
+
+    return {
+        "summary": _upload_summary(
+            results,
+            total_files=len(files),
+            total_xml=len(documents),
+        ),
+        "files": results,
+    }
 
 @router.get("/stats")
 async def get_facturas_stats():
@@ -207,25 +292,33 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
     try:
         alegra_response = await alegra_service.crear_bill(factura_model)
         supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
-        save_causacion({
-            "factura_id": factura_id,
-            "alegra_bill_id": alegra_response.get("id"),
-            "alegra_response": alegra_response,
-            "estado": "exitoso",
-            "intentos": 1,
-            "error_msg": None,
-        })
+        try:
+            save_causacion({
+                "factura_id": factura_id,
+                "alegra_bill_id": alegra_response.get("id"),
+                "alegra_response": alegra_response,
+                "estado": "exitoso",
+                "intentos": 1,
+                "error_msg": None,
+            })
+        except Exception as log_exc:
+            print(f"No se pudo guardar log de causacion exitosa para factura {factura_id}: {log_exc}")
         return alegra_response
     except AlegraDuplicateBillError as exc:
-        supabase.table("facturas").update({"estado": "duplicado"}).eq("id", factura_id).execute()
-        save_causacion({
-            "factura_id": factura_id,
-            "alegra_bill_id": None,
-            "alegra_response": {"error": str(exc), "code": "DUPLICADO_ALEGRA"},
-            "estado": "duplicado",
-            "intentos": 1,
-            "error_msg": str(exc),
-        })
+        # If Alegra reports duplicate document, the bill already exists there.
+        # Keep local invoice as processed to reflect business state in dashboard.
+        supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
+        try:
+            save_causacion({
+                "factura_id": factura_id,
+                "alegra_bill_id": None,
+                "alegra_response": {"error": str(exc), "code": "DUPLICADO_ALEGRA"},
+                "estado": "fallido",
+                "intentos": 1,
+                "error_msg": str(exc),
+            })
+        except Exception as log_exc:
+            print(f"No se pudo guardar log de causacion duplicada para factura {factura_id}: {log_exc}")
         raise HTTPException(
             status_code=409,
             detail={
@@ -235,13 +328,18 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
             },
         )
     except Exception as exc:
+        error_text = str(exc).strip() or repr(exc)
         supabase.table("facturas").update({"estado": "error"}).eq("id", factura_id).execute()
-        save_causacion({
-            "factura_id": factura_id,
-            "alegra_bill_id": None,
-            "alegra_response": {"error": str(exc)},
-            "estado": "fallido",
-            "intentos": 1,
-            "error_msg": str(exc),
-        })
-        raise HTTPException(status_code=502, detail=str(exc))
+        try:
+            save_causacion({
+                "factura_id": factura_id,
+                "alegra_bill_id": None,
+                "alegra_response": {"error": error_text},
+                "estado": "fallido",
+                "intentos": 1,
+                "error_msg": error_text,
+            })
+        except Exception as log_exc:
+            print(f"No se pudo guardar log de causacion fallida para factura {factura_id}: {log_exc}")
+        print(f"Error causando factura {factura_id}: {error_text}")
+        raise HTTPException(status_code=502, detail=error_text)

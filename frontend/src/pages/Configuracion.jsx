@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Building2, Landmark, Plus, Save, Trash2 } from 'lucide-react'
-import DataTable from '../components/DataTable'
 import ConfirmDialog from '../components/ConfirmDialog'
 import {
   createConfigCuenta,
@@ -13,124 +12,98 @@ import {
 import { useToast } from '../components/ToastProvider'
 
 const emptyForm = {
-  nit_proveedor: '',
-  nombre_cuenta: '',
+  nit_proveedor:    '',
+  nombre_cuenta:    '',
   id_cuenta_alegra: '',
-  id_retefuente: '',
-  id_reteica: '',
-  id_reteiva: '',
-  activo: true,
+  id_retefuente:    '',
+  id_reteica:       '',
+  id_reteiva:       '',
+  activo:           true,
 }
 
 export default function Configuracion() {
-  const toast = useToast()
+  const toast       = useToast()
   const formCardRef = useRef(null)
-  const [data, setData] = useState([])
-  const [catalogo, setCatalogo] = useState({ categories: [], cost_centers: [] })
-  const [form, setForm] = useState(emptyForm)
-  const [editingId, setEditingId] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [catalogLoading, setCatalogLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [deleteTarget, setDeleteTarget] = useState(null)
+
+  const [data,          setData]          = useState([])
+  const [catalogo,      setCatalogo]      = useState({ categories: [], cost_centers: [] })
+  const [form,          setForm]          = useState(emptyForm)
+  const [editingId,     setEditingId]     = useState(null)
+  const [loading,       setLoading]       = useState(false)
+  const [catalogLoading,setCatalogLoading]= useState(false)
+  const [error,         setError]         = useState(null)
+  const [deleteTarget,  setDeleteTarget]  = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  /* ── data fetchers ─────────────────────────────────────── */
   const fetchData = async () => {
-    if (!isApiConfigured) {
-      setError('VITE_API_URL no esta configurado.')
-      return
-    }
-
-    setLoading(true)
-    setError(null)
+    if (!isApiConfigured) { setError('VITE_API_URL no está configurado.'); return }
+    setLoading(true); setError(null)
     try {
       const response = await getConfigCuentas()
       setData(response.data || [])
-    } catch (err) {
-      setError('No se pudo cargar configuracion de cuentas.')
-      toast.error('No fue posible cargar la configuracion guardada.')
-    } finally {
-      setLoading(false)
-    }
+    } catch {
+      setError('No se pudo cargar la configuración de cuentas.')
+      toast.error('No fue posible cargar la configuración guardada.')
+    } finally { setLoading(false) }
   }
 
   const fetchCatalogo = async (refresh = false) => {
-    if (!isApiConfigured) {
-      return
-    }
-
+    if (!isApiConfigured) return
     setCatalogLoading(true)
     try {
       const response = await getAlegraCatalogo(refresh ? { refresh: true } : undefined)
       setCatalogo({
-        categories: response.data?.categories || [],
+        categories:   response.data?.categories   || [],
         cost_centers: response.data?.cost_centers || [],
       })
-    } catch (err) {
-      setError('No se pudo cargar el catalogo de Alegra.')
-      toast.warning('No se pudo obtener el catalogo desde Alegra.')
-    } finally {
-      setCatalogLoading(false)
-    }
+    } catch {
+      toast.warning('No se pudo obtener el catálogo desde Alegra.')
+    } finally { setCatalogLoading(false) }
   }
 
-  useEffect(() => {
-    fetchData()
-    fetchCatalogo()
-  }, [])
+  useEffect(() => { fetchData(); fetchCatalogo() }, [])
 
+  /* ── form handlers ─────────────────────────────────────── */
   const handleCuentaChange = (value) => {
     const match = catalogo.categories.find((item) => String(item.id) === String(value))
-    setForm((prev) => ({
-      ...prev,
-      id_cuenta_alegra: value,
-      nombre_cuenta: match?.name || prev.nombre_cuenta,
-    }))
+    setForm((prev) => ({ ...prev, id_cuenta_alegra: value, nombre_cuenta: match?.name || prev.nombre_cuenta }))
   }
 
-  const resetForm = () => {
-    setForm(emptyForm)
-    setEditingId(null)
-  }
+  const resetForm = () => { setForm(emptyForm); setEditingId(null) }
 
   const handleSubmit = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const payload = {
         ...form,
         id_retefuente: form.id_retefuente || null,
-        id_reteica: form.id_reteica || null,
-        id_reteiva: form.id_reteiva || null,
+        id_reteica:    form.id_reteica    || null,
+        id_reteiva:    form.id_reteiva    || null,
       }
-
       if (editingId) {
         await updateConfigCuenta(editingId, payload)
       } else {
         await createConfigCuenta(payload)
       }
-
-      resetForm()
-      await fetchData()
-      toast.success(editingId ? 'Configuracion actualizada.' : 'Configuracion creada correctamente.')
-    } catch (err) {
+      resetForm(); await fetchData()
+      toast.success(editingId ? 'Configuración actualizada.' : 'Mapeo creado correctamente.')
+    } catch {
       setError('No se pudo guardar el registro.')
       toast.error('No se pudo guardar el mapeo de cuenta.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   const handleEdit = (row) => {
     setEditingId(row.id)
     setForm({
-      nit_proveedor: row.nit_proveedor || '',
-      nombre_cuenta: row.nombre_cuenta || '',
+      nit_proveedor:    row.nit_proveedor    || '',
+      nombre_cuenta:    row.nombre_cuenta    || '',
       id_cuenta_alegra: row.id_cuenta_alegra || '',
-      id_retefuente: row.id_retefuente || '',
-      id_reteica: row.id_reteica || '',
-      id_reteiva: row.id_reteiva || '',
-      activo: row.activo ?? true,
+      id_retefuente:    row.id_retefuente    || '',
+      id_reteica:       row.id_reteica       || '',
+      id_reteiva:       row.id_reteiva       || '',
+      activo:           row.activo ?? true,
     })
     formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     toast.info(`Editando mapeo para NIT ${row.nit_proveedor}.`)
@@ -140,14 +113,9 @@ export default function Configuracion() {
     try {
       await updateConfigCuenta(row.id, { activo: !row.activo })
       await fetchData()
-    } catch (err) {
-      setError('No se pudo actualizar el estado.')
+    } catch {
       toast.error('No se pudo cambiar el estado del registro.')
     }
-  }
-
-  const handleDelete = async (row) => {
-    setDeleteTarget(row)
   }
 
   const handleConfirmDelete = async () => {
@@ -157,245 +125,324 @@ export default function Configuracion() {
       await deleteConfigCuenta(deleteTarget.id)
       await fetchData()
       toast.success('Registro eliminado correctamente.')
-    } catch (err) {
-      setError('No se pudo eliminar el registro.')
+    } catch {
       toast.error('No se pudo eliminar el registro seleccionado.')
-    } finally {
-      setDeleteLoading(false)
-      setDeleteTarget(null)
-    }
+    } finally { setDeleteLoading(false); setDeleteTarget(null) }
   }
 
-  const columns = [
-    { key: 'nit_proveedor', label: 'NIT Proveedor' },
-    {
-      key: 'nombre_proveedor',
-      label: 'Proveedor',
-      render: (row) => row.nombre_proveedor || '-',
-    },
-    { key: 'nombre_cuenta', label: 'Cuenta' },
-    { key: 'id_cuenta_alegra', label: 'ID Alegra' },
-    {
-      key: 'activo',
-      label: 'Activo',
-      render: (row) => (
-        <button
-          className={row.activo ? 'badge-success' : 'badge-muted'}
-          onClick={(event) => {
-            event.stopPropagation()
-            handleToggle(row)
-          }}
-        >
-          {row.activo ? 'Activo' : 'Inactivo'}
-        </button>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Acciones',
-      render: (row) => (
-        <div className="flex gap-2">
-          <button
-            className="btn-secondary"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleEdit(row)
-            }}
-          >
-            Editar
-          </button>
-          <button
-            className="btn-danger"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleDelete(row)
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ),
-    },
-  ]
-
+  /* ── render ─────────────────────────────────────────────── */
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-3xl font-bold">Cuentas</h2>
-        <p className="text-gray-400 mt-1">Mapeo NIT a cuentas contables en Alegra.</p>
+    <div>
+      {/* ── Page heading ─────────────────────────────────── */}
+      <div className="page-heading">
+        <div>
+          <h1 className="page-heading-title">Mapa de Cuentas</h1>
+          <p className="page-heading-sub">Mapeo NIT → cuentas contables en Alegra</p>
+        </div>
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => fetchCatalogo(true)}
+          disabled={catalogLoading}
+        >
+          {catalogLoading ? 'Actualizando catálogo…' : '↻ Actualizar catálogo Alegra'}
+        </button>
       </div>
 
-      <div ref={formCardRef} className="panel-card p-6 space-y-4">
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <Plus size={16} />
-          <span>{editingId ? 'Editar registro' : 'Nuevo registro'}</span>
+      {error && <div className="ui-alert" role="alert">{error}</div>}
+
+      {/* ── Form card ────────────────────────────────────── */}
+      <div className="sb-card" ref={formCardRef}>
+        <div className="sb-card-header">
+          <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Plus size={14} />
+            {editingId ? 'Editar registro' : 'Nuevo registro'}
+          </h2>
+          {editingId && (
+            <button className="btn-secondary btn-sm" onClick={resetForm}>
+              ✕ Cancelar edición
+            </button>
+          )}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            className="input"
-            placeholder="NIT proveedor"
-            value={form.nit_proveedor}
-            onChange={(event) => setForm((prev) => ({ ...prev, nit_proveedor: event.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="Nombre cuenta"
-            value={form.nombre_cuenta}
-            onChange={(event) => setForm((prev) => ({ ...prev, nombre_cuenta: event.target.value }))}
-          />
-          <select
-            className="input"
-            value={form.id_cuenta_alegra}
-            onChange={(event) => handleCuentaChange(event.target.value)}
+
+        <div className="sb-card-body">
+          {/* 6-field grid: 3 cols on md+ */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '0.75rem',
+              marginBottom: '1rem',
+            }}
           >
-            <option value="">Selecciona cuenta Alegra</option>
-            {catalogo.categories.map((item) => (
-              <option key={item.id} value={item.id}>
-                {(item.code || item.id)} | {item.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            placeholder="ID retefuente"
-            value={form.id_retefuente}
-            onChange={(event) => setForm((prev) => ({ ...prev, id_retefuente: event.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="ID reteica"
-            value={form.id_reteica}
-            onChange={(event) => setForm((prev) => ({ ...prev, id_reteica: event.target.value }))}
-          />
-          <input
-            className="input"
-            placeholder="ID reteiva"
-            value={form.id_reteiva}
-            onChange={(event) => setForm((prev) => ({ ...prev, id_reteiva: event.target.value }))}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm text-gray-400">
-            <input
-              type="checkbox"
-              checked={form.activo}
-              onChange={(event) => setForm((prev) => ({ ...prev, activo: event.target.checked }))}
-            />
-            Activo
-          </label>
-          <div className="flex gap-2">
-            <button className="btn-secondary" onClick={() => fetchCatalogo(true)} disabled={catalogLoading}>
-              {catalogLoading ? 'Actualizando catalogo...' : 'Actualizar catalogo Alegra'}
-            </button>
-            <button className="btn-secondary" onClick={resetForm} disabled={loading}>
-              Cancelar
-            </button>
-            <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-              <Save size={14} className="inline mr-2" />
-              Guardar
-            </button>
+            <div>
+              <label htmlFor="cfg-nit">NIT Proveedor</label>
+              <input
+                id="cfg-nit"
+                className="input"
+                placeholder="900123456"
+                value={form.nit_proveedor}
+                onChange={(e) => setForm((p) => ({ ...p, nit_proveedor: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="cfg-nombre">Nombre cuenta</label>
+              <input
+                id="cfg-nombre"
+                className="input"
+                placeholder="Ej. Compras nacionales"
+                value={form.nombre_cuenta}
+                onChange={(e) => setForm((p) => ({ ...p, nombre_cuenta: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="cfg-cuenta">Cuenta Alegra</label>
+              <select
+                id="cfg-cuenta"
+                className="input"
+                value={form.id_cuenta_alegra}
+                onChange={(e) => handleCuentaChange(e.target.value)}
+              >
+                <option value="">— Selecciona —</option>
+                {catalogo.categories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.code || item.id} | {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="cfg-retefuente">ID Retefuente</label>
+              <input
+                id="cfg-retefuente"
+                className="input"
+                placeholder="ID retención en la fuente"
+                value={form.id_retefuente}
+                onChange={(e) => setForm((p) => ({ ...p, id_retefuente: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="cfg-reteica">ID Reteica</label>
+              <input
+                id="cfg-reteica"
+                className="input"
+                placeholder="ID reteica"
+                value={form.id_reteica}
+                onChange={(e) => setForm((p) => ({ ...p, id_reteica: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label htmlFor="cfg-reteiva">ID Reteiva</label>
+              <input
+                id="cfg-reteiva"
+                className="input"
+                placeholder="ID reteiva"
+                value={form.id_reteiva}
+                onChange={(e) => setForm((p) => ({ ...p, id_reteiva: e.target.value }))}
+              />
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="panel-card p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Catalogo real de Alegra</h3>
-          <span className="text-xs text-gray-400">
-            {catalogo.categories.length} cuentas | {catalogo.cost_centers.length} centros de costo
-          </span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="panel-card">
-            <div className="panel-header">
-              <div className="flex items-center gap-2">
-                <Landmark size={16} />
-                <h3>Cuentas contables</h3>
-              </div>
-              <p>{catalogo.categories.length} registros</p>
-            </div>
-            <div className="overflow-auto max-h-72">
-              <table className="table-admin min-w-full">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Codigo</th>
-                    <th>Nombre</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalogo.categories.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.id}</td>
-                      <td>{item.code || '-'}</td>
-                      <td>{item.name}</td>
-                    </tr>
-                  ))}
-                  {catalogo.categories.length === 0 && (
-                    <tr>
-                      <td colSpan={3}>Sin cuentas cargadas.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="panel-card">
-            <div className="panel-header">
-              <div className="flex items-center gap-2">
-                <Building2 size={16} />
-                <h3>Centros de costo</h3>
-              </div>
-              <p>{catalogo.cost_centers.length} registros</p>
-            </div>
-            <div className="overflow-auto max-h-72">
-              <table className="table-admin min-w-full">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalogo.cost_centers.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.id}</td>
-                      <td>{item.name}</td>
-                      <td>{item.status || 'active'}</td>
-                    </tr>
-                  ))}
-                  {catalogo.cost_centers.length === 0 && (
-                    <tr>
-                      <td colSpan={3}>Sin centros de costo cargados.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Form footer row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem', fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
+              <input
+                type="checkbox"
+                checked={form.activo}
+                onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))}
+              />
+              Activo
+            </label>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {editingId && (
+                <button className="btn-secondary btn-sm" onClick={resetForm} disabled={loading}>
+                  Cancelar
+                </button>
+              )}
+              <button className="btn-primary" onClick={handleSubmit} disabled={loading} id="btn-guardar-cuenta">
+                <Save size={14} />
+                {loading ? 'Guardando…' : 'Guardar mapeo'}
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      {error && (
-        <div className="ui-alert text-sm">
-          {error}
+      {/* ── Catálogo de Alegra – dos cards lado a lado ──── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}
+           className="catalog-grid">
+        {/* Cuentas contables */}
+        <div className="sb-card" style={{ marginBottom: 0 }}>
+          <div className="sb-card-header">
+            <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Landmark size={14} /> Cuentas contables
+            </h2>
+            <span className="text-muted text-xs fw-bold">{catalogo.categories.length} registros</span>
+          </div>
+          <div
+            className="table-responsive"
+            style={{ maxHeight: '350px', overflowY: 'auto' }}
+          >
+            <table className="table-admin" style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Código</th>
+                  <th>Nombre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogo.categories.map((item) => (
+                  <tr key={item.id}>
+                    <td className="text-muted text-sm">{item.id}</td>
+                    <td className="fw-bold text-sm">{item.code || '—'}</td>
+                    <td className="text-sm">{item.name}</td>
+                  </tr>
+                ))}
+                {catalogo.categories.length === 0 && (
+                  <tr>
+                    <td colSpan={3}>
+                      <div className="table-empty" style={{ padding: '1.5rem' }}>
+                        Sin cuentas cargadas.
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
 
-      <DataTable
-        columns={columns}
-        data={data}
-        loading={loading}
-        emptyLabel="No hay cuentas configuradas."
-      />
+        {/* Centros de costo */}
+        <div className="sb-card" style={{ marginBottom: 0 }}>
+          <div className="sb-card-header">
+            <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Building2 size={14} /> Centros de costo
+            </h2>
+            <span className="text-muted text-xs fw-bold">{catalogo.cost_centers.length} registros</span>
+          </div>
+          <div
+            className="table-responsive"
+            style={{ maxHeight: '350px', overflowY: 'auto' }}
+          >
+            <table className="table-admin" style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogo.cost_centers.map((item) => (
+                  <tr key={item.id}>
+                    <td className="text-muted text-sm">{item.id}</td>
+                    <td className="text-sm">{item.name}</td>
+                    <td className="text-sm">
+                      <span className={`status-badge ${item.status === 'active' ? 'badge-success' : 'badge-muted'}`}>
+                        {item.status || 'active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {catalogo.cost_centers.length === 0 && (
+                  <tr>
+                    <td colSpan={3}>
+                      <div className="table-empty" style={{ padding: '1.5rem' }}>
+                        Sin centros de costo cargados.
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
+      {/* ── Registros guardados ──────────────────────────── */}
+      <div className="sb-card">
+        <div className="sb-card-header">
+          <h2 className="sb-card-header-title">Mapeos registrados</h2>
+          <span className="text-muted text-xs fw-bold">{data.length} registro{data.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div className="table-responsive">
+          <table className="table-admin" aria-label="Mapeos de cuentas">
+            <thead>
+              <tr>
+                <th>NIT Proveedor</th>
+                <th className="d-none-mobile">Proveedor</th>
+                <th>Cuenta</th>
+                <th className="d-none-mobile">ID Alegra</th>
+                <th>Activo</th>
+                <th style={{ width: '130px' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="table-empty">⏳ Cargando…</div>
+                  </td>
+                </tr>
+              )}
+              {!loading && data.map((row) => (
+                <tr key={row.id}>
+                  <td className="fw-bold">{row.nit_proveedor}</td>
+                  <td className="d-none-mobile text-muted">{row.nombre_proveedor || '—'}</td>
+                  <td>{row.nombre_cuenta}</td>
+                  <td className="d-none-mobile text-muted">{row.id_cuenta_alegra || '—'}</td>
+                  <td>
+                    <button
+                      className={`status-badge ${row.activo ? 'badge-success' : 'badge-muted'}`}
+                      onClick={(e) => { e.stopPropagation(); handleToggle(row) }}
+                      title="Alternar estado"
+                    >
+                      {row.activo ? 'Activo' : 'Inactivo'}
+                    </button>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        className="btn-secondary btn-sm"
+                        onClick={(e) => { e.stopPropagation(); handleEdit(row) }}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="btn-danger btn-sm"
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(row) }}
+                        aria-label="Eliminar"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && data.length === 0 && (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="table-empty">
+                      <div className="table-empty-icon">🗂️</div>
+                      <p className="fw-bold">No hay mapeos configurados</p>
+                      <p className="text-sm text-muted mt-1">Crea el primer mapeo en el formulario superior.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Confirm dialog ───────────────────────────────── */}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
-        title="Confirmar eliminacion"
+        title="Confirmar eliminación"
         message={
           deleteTarget
-            ? `Vas a eliminar la configuracion del NIT ${deleteTarget.nit_proveedor}. Esta accion no se puede deshacer.`
+            ? `Vas a eliminar la configuración del NIT ${deleteTarget.nit_proveedor}. Esta acción no se puede deshacer.`
             : ''
         }
         confirmLabel="Eliminar"

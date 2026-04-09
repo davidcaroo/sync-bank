@@ -10,6 +10,12 @@ export const getFacturas = (params) => api.get('/facturas', { params })
 export const getFacturaById = (id) => api.get(`/facturas/${id}`)
 export const causarFactura = (id, payload) => api.post(`/facturas/${id}/causar`, payload)
 export const getFacturasStats = () => api.get('/facturas/stats')
+export const previewFacturasUpload = (formData, applyAi = true) => api.post(`/facturas/preview-upload?apply_ai=${applyAi}`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+})
+export const uploadFacturas = (formData, applyAi = true) => api.post(`/facturas/upload?apply_ai=${applyAi}`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+})
 
 export const getConfigCuentas = (params) => api.get('/config', { params })
 export const getAlegraCatalogo = (params) => api.get('/config/alegra/catalogo', { params })

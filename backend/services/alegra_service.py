@@ -253,17 +253,22 @@ class AlegraService:
                 "date": factura.fecha_emision.strftime("%Y-%m-%d") if factura.fecha_emision else datetime.utcnow().strftime("%Y-%m-%d"),
                 "dueDate": (factura.fecha_vencimiento or factura.fecha_emision or datetime.utcnow()).strftime("%Y-%m-%d"),
                 "provider": {"id": provider_id},
-                "items": [
-                    {
-                        "id": int(item.cuenta_contable_alegra) if item.cuenta_contable_alegra and str(item.cuenta_contable_alegra).isdigit() else int(settings.ALEGRA_CUENTA_DEFAULT_GASTOS),
-                        "description": item.descripcion[:200],
-                        "price": item.precio_unitario,
-                        "quantity": item.cantidad,
-                        "tax": [{"id": 1}], # Default IVA
-                        "costCenter": {"id": int(item.centro_costo_alegra)} if item.centro_costo_alegra and str(item.centro_costo_alegra).isdigit() else None,
-                    } for item in factura.items
-                ],
-                "type": "bill"
+                "numberTemplate": {
+                    "number": factura.numero_factura,
+                },
+                "purchases": {
+                    "categories": [
+                        {
+                            "id": int(item.cuenta_contable_alegra) if item.cuenta_contable_alegra and str(item.cuenta_contable_alegra).isdigit() else int(settings.ALEGRA_CUENTA_DEFAULT_GASTOS),
+                            "price": item.precio_unitario,
+                            "quantity": item.cantidad,
+                            "tax": [{"id": 1}],  # Default IVA
+                            "costCenter": {"id": int(item.centro_costo_alegra)} if item.centro_costo_alegra and str(item.centro_costo_alegra).isdigit() else None,
+                        }
+                        for item in factura.items
+                    ]
+                },
+                "observations": f"Factura DIAN {factura.numero_factura or ''} - CUFE {factura.cufe or 'N/A'}"[:500],
             }
 
             res = await client.post(f"{self.base_url}/bills", json=payload, headers=self.headers)
