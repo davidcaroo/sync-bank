@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query
-from services.supabase_service import supabase
+from repositories.logs_repository import list_logs_paginated
+from repositories.db_utils import run_in_executor
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 
@@ -9,14 +10,7 @@ async def list_logs(
     page_size: int = Query(20, ge=1, le=200),
     estado: str | None = None,
 ):
-    query = supabase.table("logs_email").select("*", count="exact")
-    if estado:
-        query = query.eq("estado", estado)
-
-    start = (page - 1) * page_size
-    end = start + page_size - 1
-
-    res = query.order("created_at", desc=True).range(start, end).execute()
+    res = await run_in_executor(lambda: list_logs_paginated(page=page, page_size=page_size, estado=estado))
     return {
         "data": res.data or [],
         "count": res.count or 0,

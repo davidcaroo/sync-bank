@@ -1,0 +1,6 @@
+pytest==8.2.0
+pytest-asyncio==0.23.7
+ruff==0.5.4
+black==24.4.2
+safety==3.2.3
+pre-commit==3.7.1

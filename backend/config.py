@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     ALEGRA_CUENTA_DEFAULT_GASTOS: str = "5001"
     
     SUPABASE_URL: str
-    SUPABASE_KEY: str
+    SUPABASE_KEY: str | None = None
+    SUPABASE_SERVICE_KEY: str | None = None
+
+    ADMIN_API_KEY: str | None = None
     
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:3b"

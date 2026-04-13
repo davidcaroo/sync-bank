@@ -7,12 +7,12 @@ import httpx
 from config import settings
 from services.ai_service import clasificar_item
 from services.alegra_service import alegra_service
-from services.supabase_service import (
-    find_factura_by_cufe,
+from repositories.config_repository import (
     get_config_cuenta,
-    save_factura,
     sync_config_proveedor_nombre,
 )
+from repositories.factura_repository import find_factura_by_cufe, save_factura
+from repositories.db_utils import run_in_executor
 from services.xml_parser import parse_xml_dian
 
 
@@ -124,10 +124,26 @@ class IngestionService:
                 "reason": f"Error de parser XML: {exc}",
             }
 
-        sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor)
+        await run_in_executor(lambda: sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor))
 
         prefilled_items = []
-        config = get_config_cuenta(factura.nit_proveedor)
+
+        config = await run_in_executor(lambda: get_config_cuenta(factura.nit_proveedor))
+
+        # If there's no existing mapping, try to compute it from local history
+        if not config:
+            try:
+                from services.provider_mapping_service import provider_mapping_service
+
+                # Attempt to compute and save a mapping based on historical invoices.
+                await provider_mapping_service.compute_and_save_mapping(
+                    factura.nit_proveedor, factura.nombre_proveedor
+                )
+                # Re-read config after attempting to compute it
+                config = await run_in_executor(lambda: get_config_cuenta(factura.nit_proveedor))
+            except Exception:
+                # Non-fatal: proceed without mapping if computation fails
+                config = await run_in_executor(lambda: get_config_cuenta(factura.nit_proveedor))
 
         for item in factura.items:
             prefill_source = "none"
@@ -164,7 +180,7 @@ class IngestionService:
                 }
             )
 
-        duplicate = bool(find_factura_by_cufe(factura.cufe)) if factura.cufe else False
+        duplicate = bool(await run_in_executor(lambda: find_factura_by_cufe(factura.cufe))) if factura.cufe else False
 
         factura_preview = {
             "cufe": factura.cufe,
@@ -198,10 +214,10 @@ class IngestionService:
         factura_payload["estado"] = "pendiente"
 
         try:
-            save_result = save_factura(
+            save_result = await run_in_executor(lambda: save_factura(
                 factura_payload,
-                [i.model_dump(mode="json") for i in factura.items],
-            )
+                prefilled_items,
+            ))
         except Exception as exc:
             return {
                 "file_name": xml_doc.file_name,

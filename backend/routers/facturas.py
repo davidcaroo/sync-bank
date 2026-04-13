@@ -3,12 +3,25 @@ from dateutil import parser as date_parser
 from datetime import datetime
 from pydantic import BaseModel
 import httpx
-from services.supabase_service import supabase, save_causacion, get_successful_causacion
+from services.supabase_service import save_causacion
+from repositories.factura_repository import (
+    get_successful_causacion,
+    get_facturas_stats as repo_get_facturas_stats,
+    get_facturas_paginated,
+    get_factura_with_items,
+    update_factura_fields,
+    update_item_fields,
+)
+from repositories.db_utils import run_in_executor
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from services.ingestion_service import ingestion_service
+from services.provider_mapping_service import provider_mapping_service
 from services.timezone_service import BOGOTA_TZ, now_bogota, to_bogota
 from services.xml_parser import parse_xml_dian
 from models.factura import FacturaDIAN, FacturaItem
+import logging
+
+logger = logging.getLogger("facturas")
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -82,7 +95,7 @@ async def _hydrate_items_from_alegra_if_needed(factura: dict) -> dict:
 
         if patch:
             try:
-                supabase.table("items_factura").update(patch).eq("id", item.get("id")).execute()
+                await run_in_executor(lambda: update_item_fields(item.get("id"), patch))
             except Exception:
                 continue
 
@@ -133,6 +146,15 @@ def _enrich_factura_monetary_fields(factura: dict) -> dict:
     factura["total"] = total_stored
 
     return factura
+
+
+def _normalize_items_prefill(items: list[dict]) -> list[dict]:
+    for item in items:
+        if "prefill_source" not in item or item.get("prefill_source") is None:
+            item["prefill_source"] = "unknown"
+        if "confidence" not in item:
+            item["confidence"] = None
+    return items
 
 
 def _preview_summary(results: list[dict], *, total_files: int, total_xml: int) -> dict:
@@ -220,8 +242,7 @@ async def upload_facturas(files: list[UploadFile] = File(...), apply_ai: bool = 
 
 @router.get("/stats")
 async def get_facturas_stats():
-    res = supabase.table("facturas").select("estado, created_at").execute()
-    facturas = res.data or []
+    facturas = await run_in_executor(lambda: repo_get_facturas_stats())
     hoy = 0
     causadas = 0
     pendientes = 0
@@ -259,22 +280,18 @@ async def get_facturas(
     desde: str | None = None,
     hasta: str | None = None,
 ):
-    query = supabase.table("facturas").select("*, items_factura(*)", count="exact")
-
-    if estado:
-        query = query.eq("estado", estado)
-    if proveedor:
-        query = query.ilike("nombre_proveedor", f"%{proveedor}%")
-    if desde:
-        query = query.gte("fecha_emision", desde)
-    if hasta:
-        query = query.lte("fecha_emision", hasta)
-
-    start = (page - 1) * page_size
-    end = start + page_size - 1
-
-    res = query.order("created_at", desc=True).range(start, end).execute()
+    res = await run_in_executor(lambda: get_facturas_paginated(
+        page=page,
+        page_size=page_size,
+        estado=estado,
+        proveedor=proveedor,
+        desde=desde,
+        hasta=hasta,
+    ))
     rows = res.data or []
+    for row in rows:
+        items = row.get("items_factura") or []
+        row["items_factura"] = _normalize_items_prefill(items)
     rows = [_enrich_factura_monetary_fields(row) for row in rows]
     return {
         "data": rows,
@@ -285,21 +302,22 @@ async def get_facturas(
 
 @router.get("/{factura_id}")
 async def get_factura(factura_id: str):
-    res = supabase.table("facturas").select("*, items_factura(*)").eq("id", factura_id).single().execute()
-    if not res.data:
+    factura = await run_in_executor(lambda: get_factura_with_items(factura_id))
+    if not factura:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
-    factura = await _hydrate_items_from_alegra_if_needed(res.data)
+    factura = await _hydrate_items_from_alegra_if_needed(factura)
+    items = factura.get("items_factura") or []
+    factura["items_factura"] = _normalize_items_prefill(items)
     return _enrich_factura_monetary_fields(factura)
 
 @router.post("/{factura_id}/causar")
 async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None = None):
-    res = supabase.table("facturas").select("*, items_factura(*)").eq("id", factura_id).single().execute()
-    factura_data = res.data
+    factura_data = await run_in_executor(lambda: get_factura_with_items(factura_id))
     if not factura_data:
         raise HTTPException(status_code=404, detail="Factura no encontrada")
 
     if factura_data.get("estado") == "procesado":
-        existing = get_successful_causacion(factura_id)
+        existing = await run_in_executor(lambda: get_successful_causacion(factura_id))
         detail = {
             "message": "Factura ya causada",
             "code": "FACTURA_YA_CAUSADA",
@@ -307,9 +325,9 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
         }
         raise HTTPException(status_code=409, detail=detail)
 
-    existing_success = get_successful_causacion(factura_id)
+    existing_success = await run_in_executor(lambda: get_successful_causacion(factura_id))
     if existing_success:
-        supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
+        await run_in_executor(lambda: update_factura_fields(factura_id, {"estado": "procesado"}))
         raise HTTPException(
             status_code=409,
             detail={
@@ -334,14 +352,37 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
             missing_confirmation.append(str(item.get("id")))
 
     if missing_confirmation:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "message": "Factura en revision manual: confirma cuenta por item antes de causar",
-                "code": "REQUIERE_CONFIRMACION_MANUAL",
-                "missing_item_ids": missing_confirmation,
-            },
-        )
+        # Try to compute mapping from history or Alegra and persist it, then reload items
+        try:
+            await provider_mapping_service.compute_and_save_mapping(
+                factura_data.get("nit_proveedor"), factura_data.get("nombre_proveedor")
+            )
+            # Refresh factura data from DB
+            refreshed = await run_in_executor(lambda: get_factura_with_items(factura_id))
+            if refreshed:
+                factura_data = refreshed
+        except Exception:
+            pass
+
+        # Re-evaluate missing confirmations after attempting autofill
+        missing_confirmation = []
+        for item in factura_data.get("items_factura", []) or []:
+            override = overrides_map.get(str(item.get("id")))
+            cuenta_actual = item.get("cuenta_contable_alegra")
+            cuenta_override = override.cuenta_contable_alegra if override else None
+            effective_cuenta = cuenta_override if cuenta_override is not None else cuenta_actual
+            if not effective_cuenta:
+                missing_confirmation.append(str(item.get("id")))
+
+        if missing_confirmation:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Factura en revision manual: confirma cuenta por item antes de causar",
+                    "code": "REQUIERE_CONFIRMACION_MANUAL",
+                    "missing_item_ids": missing_confirmation,
+                },
+            )
 
     # Best-effort sync: if provider already exists in Alegra for this NIT,
     # persist the official contact name so UI and accounting views stay consistent.
@@ -361,7 +402,7 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
         resolved_name = None
 
     if resolved_name and resolved_name != (factura_data.get("nombre_proveedor") or ""):
-        supabase.table("facturas").update({"nombre_proveedor": resolved_name}).eq("id", factura_id).execute()
+        await run_in_executor(lambda: update_factura_fields(factura_id, {"nombre_proveedor": resolved_name}))
         factura_data["nombre_proveedor"] = resolved_name
 
     items = []
@@ -376,10 +417,10 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
             if override.centro_costo_alegra is not None:
                 centro_costo = override.centro_costo_alegra
 
-            supabase.table("items_factura").update({
+            await run_in_executor(lambda: update_item_fields(item.get("id"), {
                 "cuenta_contable_alegra": cuenta_contable,
                 "centro_costo_alegra": centro_costo,
-            }).eq("id", item.get("id")).execute()
+            }))
 
         items.append(FacturaItem(
             descripcion=item.get("descripcion", ""),
@@ -413,34 +454,34 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
 
     try:
         alegra_response = await alegra_service.crear_bill(factura_model)
-        supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
+        await run_in_executor(lambda: update_factura_fields(factura_id, {"estado": "procesado"}))
         try:
-            save_causacion({
+            await run_in_executor(lambda: save_causacion({
                 "factura_id": factura_id,
                 "alegra_bill_id": alegra_response.get("id"),
                 "alegra_response": alegra_response,
                 "estado": "exitoso",
                 "intentos": 1,
                 "error_msg": None,
-            })
+            }))
         except Exception as log_exc:
-            print(f"No se pudo guardar log de causacion exitosa para factura {factura_id}: {log_exc}")
+            logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
         return alegra_response
     except AlegraDuplicateBillError as exc:
         # If Alegra reports duplicate document, the bill already exists there.
         # Keep local invoice as processed to reflect business state in dashboard.
-        supabase.table("facturas").update({"estado": "procesado"}).eq("id", factura_id).execute()
+        await run_in_executor(lambda: update_factura_fields(factura_id, {"estado": "procesado"}))
         try:
-            save_causacion({
+            await run_in_executor(lambda: save_causacion({
                 "factura_id": factura_id,
                 "alegra_bill_id": None,
                 "alegra_response": {"error": str(exc), "code": "DUPLICADO_ALEGRA"},
                 "estado": "fallido",
                 "intentos": 1,
                 "error_msg": str(exc),
-            })
+            }))
         except Exception as log_exc:
-            print(f"No se pudo guardar log de causacion duplicada para factura {factura_id}: {log_exc}")
+            logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
         raise HTTPException(
             status_code=409,
             detail={
@@ -451,17 +492,17 @@ async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None =
         )
     except Exception as exc:
         error_text = str(exc).strip() or repr(exc)
-        supabase.table("facturas").update({"estado": "error"}).eq("id", factura_id).execute()
+        await run_in_executor(lambda: update_factura_fields(factura_id, {"estado": "error"}))
         try:
-            save_causacion({
+            await run_in_executor(lambda: save_causacion({
                 "factura_id": factura_id,
                 "alegra_bill_id": None,
                 "alegra_response": {"error": error_text},
                 "estado": "fallido",
                 "intentos": 1,
                 "error_msg": error_text,
-            })
+            }))
         except Exception as log_exc:
-            print(f"No se pudo guardar log de causacion fallida para factura {factura_id}: {log_exc}")
-        print(f"Error causando factura {factura_id}: {error_text}")
+            logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
+        logger.error("causacion_error", extra={"factura_id": factura_id, "error": error_text})
         raise HTTPException(status_code=502, detail=error_text)

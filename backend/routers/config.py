@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 import httpx
-from services.supabase_service import supabase
+from repositories.config_repository import (
+    list_config_cuentas as repo_list_config_cuentas,
+    create_config_cuenta as repo_create_config_cuenta,
+    update_config_cuenta as repo_update_config_cuenta,
+    delete_config_cuenta as repo_delete_config_cuenta,
+)
+from repositories.db_utils import run_in_executor
 from services.alegra_service import alegra_service
 
 router = APIRouter(prefix="/config", tags=["config"])
@@ -37,29 +43,25 @@ async def resolve_alegra_provider(
 
 @router.get("/")
 async def list_config_cuentas(activo: bool | None = None):
-    query = supabase.table("config_cuentas").select("*")
-    if activo is not None:
-        query = query.eq("activo", activo)
-    res = query.order("created_at", desc=True).execute()
-    return res.data or []
+    return await run_in_executor(lambda: repo_list_config_cuentas(activo=activo))
 
 @router.post("/")
 async def create_config_cuenta(payload: dict):
-    res = supabase.table("config_cuentas").insert(payload).execute()
-    if not res.data:
+    created = await run_in_executor(lambda: repo_create_config_cuenta(payload))
+    if not created:
         raise HTTPException(status_code=400, detail="No se pudo crear el registro")
-    return res.data[0]
+    return created
 
 @router.patch("/{config_id}")
 async def update_config_cuenta(config_id: str, payload: dict):
-    res = supabase.table("config_cuentas").update(payload).eq("id", config_id).execute()
-    if not res.data:
+    updated = await run_in_executor(lambda: repo_update_config_cuenta(config_id, payload))
+    if not updated:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
-    return res.data[0]
+    return updated
 
 @router.delete("/{config_id}")
 async def delete_config_cuenta(config_id: str):
-    res = supabase.table("config_cuentas").delete().eq("id", config_id).execute()
-    if not res.data:
+    deleted = await run_in_executor(lambda: repo_delete_config_cuenta(config_id))
+    if not deleted:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
     return {"status": "deleted"}

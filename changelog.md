@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-04-13] - Correccion CORS y respuestas consistentes
+### Corregido
+- **CORS en API**: Se reordeno el middleware para garantizar `Access-Control-Allow-Origin` en todas las respuestas, evitando bloqueos desde `http://localhost:3000`.
+
 ## [2026-04-09] - Estabilidad Operativa: ZIP, Zona Horaria, Duplicados Alegra e Iconos
 ### Corregido
 - **Sincronización y carga ZIP robusta**:
@@ -199,6 +203,32 @@
 ## [2026-04-08] - Integración de Catálogo Alegra y Mapeo Operativo
 ### Añadido
 - **Catálogo Alegra en backend**: Nuevo endpoint `GET /api/config/alegra/catalogo` que devuelve cuentas contables y centros de costo reales desde Alegra para uso del frontend.
+
+## [2026-04-13] - Autofill proveedor→cuenta, auditoría y automatización de mapeos
+### Añadido
+- **Autofill de cuenta contable por NIT**:
+	- Nuevo servicio `backend/services/provider_mapping_service.py` que computa la cuenta contable más frecuente por `nit_proveedor` usando historial local (`items_factura`) y, como fallback, consultas a Alegra. Persistencia automática en `config_cuentas` cuando hay suficiente confianza.
+	- La lógica de ingestión (`backend/services/ingestion_service.py`) ahora intenta recomputar y aplicar un mapping antes de invocar la clasificación por IA, evitando pasos manuales innecesarios.
+
+- **Endpoint administrativo para recomputar mappings**:
+	- Nuevo endpoint `POST /api/providers/recompute` en `backend/routers/providers.py` para recomputar mappings por NIT o en lote desde facturas locales.
+
+- **Autofill en flujo de causación**:
+	- `POST /api/facturas/{id}/causar` ahora intenta un autofill (local → Alegra) antes de solicitar confirmación manual por item, reduciendo bloqueos de causación.
+
+- **Auditoría de mappings**:
+	- Nuevo helper `save_config_cuenta(...)` en `backend/services/supabase_service.py` realiza `upsert` en `config_cuentas` y escribe un registro en `config_cuentas_audit` para mantener trazabilidad.
+
+- **Scheduler**:
+	- Job programado en `backend/scheduler.py` que intenta recomputar mappings periódicamente (cada 6 horas por defecto).
+
+### Modificado
+- **UI: Modal de factura** (`frontend/src/components/FacturaModal.jsx`): las cuentas autocompletadas aparecen deshabilitadas por defecto y se añade botón `Editar` para permitir corrección manual; así el usuario solo debe seleccionar centro de costos y presionar `Causar` en la mayoría de los casos.
+
+### Notas
+- Asegúrate de ejecutar las migraciones/creación de tabla `config_cuentas_audit` en Supabase para habilitar auditoría.
+- Recomendado: revisar `MIN_OCCURRENCES` y `MIN_SHARE` en `provider_mapping_service.py` para ajustar sensibilidad.
+
 - **Consulta de cuentas y centros**: Integración de `GET /categories?type=expense` y `GET /cost-centers` en servicio de Alegra con cache en memoria para reducir llamadas repetidas.
 - **Script de diagnóstico**: Disponible `backend/scripts/list_alegra_accounts.py` para listar IDs de cuentas de gastos en la cuenta de Alegra.
 - **Catálogo en vista de Cuentas**: La vista de configuración ahora muestra listas reales de cuentas y centros de costo y permite refrescarlas con el botón "Actualizar catálogo Alegra".

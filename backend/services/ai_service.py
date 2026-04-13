@@ -1,5 +1,8 @@
 import httpx
+import logging
 from config import settings
+
+logger = logging.getLogger("ai-service")
 
 async def clasificar_item(descripcion: str, cuentas: list, centros_costo: list | None = None):
     centros_costo = centros_costo or []
@@ -18,7 +21,7 @@ async def clasificar_item(descripcion: str, cuentas: list, centros_costo: list |
                     "confianza": payload.get("confianza", 0.0),
                 }
     except Exception as e:
-        print(f"Error calling AI service: {e}")
+        logger.error("ai_service_error", extra={"error": str(e)})
     
     return {
         "cuenta_id": settings.ALEGRA_CUENTA_DEFAULT_GASTOS,

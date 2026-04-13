@@ -24,6 +24,7 @@ export default function FacturaModal({
   const totalBruto = Number(factura.total_bruto || subtotal + iva)
   const totalRetenciones = Number(factura.total_retenciones || reteFuente + reteIca + reteIva)
   const totalNeto = Number(factura.total_neto || factura.total || 0)
+  const hasAutoPrefill = items.some((item) => ['config', 'ai', 'historical', 'alegra'].includes(item.prefill_source))
 
   return (
     <div
@@ -111,6 +112,21 @@ export default function FacturaModal({
             </div>
           </div>
 
+          {hasAutoPrefill && (
+            <div
+              style={{
+                marginTop: '0.85rem',
+                border: '1px dashed var(--border)',
+                borderRadius: '0.375rem',
+                padding: '0.6rem 0.85rem',
+                background: 'var(--panel-soft)',
+              }}
+              className="text-sm"
+            >
+              Se aplico autocompletado de cuentas contables. Puedes editar cualquier cuenta antes de causar.
+            </div>
+          )}
+
           {/* Items table */}
           <div style={{
             border: '1px solid var(--border)',
@@ -175,19 +191,18 @@ export default function FacturaModal({
                       <td>${Number(item.precio_unitario || 0).toLocaleString('es-CO')}</td>
 
                       {/* Cuenta Alegra */}
-                      <td>
+                      <td style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <select
                           className="input"
                           style={{ minWidth: 0, width: '100%', fontSize: '0.8rem', padding: '0.3rem 0.5rem' }}
                           value={cuentaActual}
-                          onChange={(e) =>
-                            onItemChange?.(item.id, 'cuenta_contable_alegra', e.target.value)
-                          }
+                          onChange={(e) => onItemChange?.(item.id, 'cuenta_contable_alegra', e.target.value)}
+                          disabled={!!cuentaActual}
                         >
                           <option value="">— Cuenta —</option>
                           {cuentaActual && !hasCuentaInCatalog && (
                             <option value={cuentaActual}>
-                              {cuentaActual} | (registrada en Alegra)
+                              {cuentaActual} | (autocompletada)
                             </option>
                           )}
                           {categories.map((cat) => (
@@ -196,6 +211,16 @@ export default function FacturaModal({
                             </option>
                           ))}
                         </select>
+                        {cuentaActual && (
+                          <button
+                            className="btn-link"
+                            onClick={() => onItemChange?.(item.id, 'cuenta_contable_alegra', '')}
+                            title="Editar cuenta"
+                            style={{ fontSize: '0.75rem' }}
+                          >
+                            Editar
+                          </button>
+                        )}
                       </td>
 
                       {/* Centro de costo */}
