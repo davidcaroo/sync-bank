@@ -54,6 +54,53 @@ export default function Facturas() {
     return fallback
   }
 
+  const buildCausarNotification = (err) => {
+    const status = Number(err?.response?.status || 0)
+    const msg = getBackendErrorMessage(err, 'No se pudo enviar a Alegra. Revisa la configuración.')
+    const code = err?.response?.data?.detail?.code
+
+    if (code === 'DUPLICADO_ALEGRA' || code === 'FACTURA_YA_CAUSADA') {
+      return { kind: 'warning', message: msg, code }
+    }
+
+    if (code === 'NO_VERIFICADO_ALEGRA') {
+      return {
+        kind: 'warning',
+        code,
+        message: 'No se pudo confirmar en Alegra si la factura aún existe. Intenta de nuevo en unos segundos.',
+      }
+    }
+
+    if (
+      status === 502
+      && msg.includes('No se pudo encontrar ni crear el proveedor')
+      && msg.toLowerCase().includes('ya existe un contacto con la identificacion')
+    ) {
+      return {
+        kind: 'error',
+        code,
+        message: 'Alegra rechazó la causación porque el NIT ya existe como contacto y no se pudo resolver automáticamente como proveedor. Verifica el contacto en Alegra y vuelve a intentar.',
+      }
+    }
+
+    if (status === 502) {
+      if (msg.toLowerCase().includes('no se encontro un impuesto activo en alegra para iva')) {
+        return {
+          kind: 'error',
+          code,
+          message: 'No se pudo causar la factura porque en Alegra no hay un impuesto IVA activo con ese porcentaje. Revisa el catálogo de impuestos en Alegra.',
+        }
+      }
+      return {
+        kind: 'error',
+        code,
+        message: `Error de integración con Alegra: ${msg}`,
+      }
+    }
+
+    return { kind: 'error', message: msg, code }
+  }
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / pageSize)), [count, pageSize])
 
   const buildUploadFormData = () => {
@@ -135,10 +182,10 @@ export default function Facturas() {
       setSelected(null)
       toast.success('Factura causada correctamente en Alegra.')
     } catch (err) {
-      const msg = getBackendErrorMessage(err, 'No se pudo enviar a Alegra. Revisa la configuración.')
-      const code = err?.response?.data?.detail?.code
+      const notification = buildCausarNotification(err)
+      const code = notification.code
       if (code === 'DUPLICADO_ALEGRA' || code === 'FACTURA_YA_CAUSADA') {
-        toast.warning(msg)
+        toast.warning(notification.message)
         await fetchData()
         if (selected?.id) {
           try {
@@ -151,8 +198,12 @@ export default function Facturas() {
           }
         }
       } else {
-        setError(msg)
-        toast.error(msg)
+        setError(notification.message)
+        if (notification.kind === 'warning') {
+          toast.warning(notification.message)
+        } else {
+          toast.error(notification.message)
+        }
       }
     } finally {
       setCausarLoading(false)

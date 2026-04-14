@@ -1,5 +1,136 @@
 # Changelog
 
+## [2026-04-14] - Fix: Causación con IVA en Alegra
+### Corregido
+- Se eliminó el impuesto fijo `tax: [{"id": 1}]` en `backend/services/alegra_client.py` al crear bills.
+- Ahora el backend resuelve el `tax.id` dinámicamente por porcentaje de IVA de cada ítem (`iva_porcentaje`) consultando `GET /taxes` en Alegra.
+- Si no existe un impuesto activo en Alegra para el porcentaje requerido (ej. 19%), el sistema ya no causa con impuesto incorrecto; devuelve error explícito para corregir configuración.
+
+### Hallazgo técnico
+- La factura sí llegaba con IVA desde DIAN y con `iva_porcentaje=19` por ítem.
+- El IVA se perdía en la causación porque `id=1` en la cuenta Alegra corresponde a IVA `0%`.
+
+### Mejorado
+- Se añadió notificación en frontend (`frontend/src/pages/Facturas.jsx`) para informar al usuario cuando falta configuración de impuesto IVA en Alegra.
+
+### Validación
+- Verificación de datos de factura en backend: `iva_total=9531.932772` e ítems con `iva_porcentaje=19.0`.
+- Verificación de impuestos en Alegra: disponible `19%` y resolución dinámica activa (`resolved_tax_id_19 = 4`).
+- Pruebas backend: `12 passed`.
+
+
+## [2026-04-14] - Fix: error 502 en causación y notificación al usuario
+### Corregido
+- **Causación en Alegra (`POST /api/facturas/{id}/causar`)**: se ajustó la resolución de proveedor en `backend/services/alegra_client.py` para manejar correctamente el caso en que Alegra responde "ya existe un contacto con la identificación".
+- El flujo ahora intenta recuperar el contacto existente por:
+	- búsqueda por identificación con `type=provider`,
+	- fallback por identificación sin filtrar `type`,
+	- y fallback por `contactId` retornado por Alegra en el error (`code=2006`).
+
+### Mejorado
+- **Notificación de frontend** en `frontend/src/pages/Facturas.jsx`: cuando ocurre `502` durante `Causar en Alegra`, se muestra un mensaje explicativo y accionable para el usuario (no solo error genérico).
+
+### Validación
+- Reproducción del caso reportado con factura `f313c2fa-2022-4020-b7c3-67f286a9d19a`:
+	- Antes: `502 Bad Gateway`.
+	- Después de la corrección: `200 OK` con creación de bill en Alegra.
+- Suite backend en contenedor: `10 passed`.
+
+
+## [2026-04-14] - Deploy: Docker images built and stack tested
+### Acciones realizadas
+- Construidas imágenes y levantado el stack usando `docker compose build` y `docker compose up -d`.
+- Imágenes locales creadas: `sync-bank-backend:latest`, `sync-bank-frontend:latest`, `sync-bank-ai-service:latest`.
+- Ejecutada la suite de pruebas dentro de un contenedor temporal con instalación rápida de deps de test:
+
+```
+docker compose run --rm backend /bin/sh -c "pip install pytest pytest-asyncio -q; python -m pytest -q"
+```
+
+- Resultado de tests: `9 passed, 3 warnings`.
+
+### Notas
+- Los tests se ejecutaron instalando `pytest` en un contenedor temporal; se recomienda añadir las dependencias de desarrollo a `backend/requirements-dev.txt` o incluirlos en la imagen de CI para evitar instalaciones ad-hoc en runtime.
+- No se realizó push a un registry remoto. Si deseas que suba las imágenes a Docker Hub u otro registry, indícame el nombre del repositorio y credenciales, o proporciona acceso mediante `docker login` en tu entorno.
+
+## [2026-04-14] - Refactor: Cliente Alegra, excepciones tipadas y factura_service
+### Añadido / Modificado
+- **Excepciones tipadas**: `backend/services/errors.py` — `ServiceError`, `RemoteAPIError`, `InvalidXMLError`, `AlegraDuplicateBillError`. Objetivo: centralizar tipos de error para manejo consistente y facilitar testeo.
+- **Alegra HTTP client**: `backend/services/alegra_client.py` — nuevo cliente HTTP con helpers para llamadas a Alegra (catálogos, contactos, creación de bills y parsing). Ventaja: desacopla lógica HTTP/parsing de la capa de negocio y facilita mocks en pruebas.
+- **Facade `alegra_service`**: `backend/services/alegra_service.py` refactorizado a una fachada delgada que delega en `AlegraClient`, preservando la API pública existente para compatibilidad.
+- **Servicio de facturas**: `backend/services/factura_service.py` — migrada la lógica principal del router (`hidratación` de items, enriquecimiento monetario, preview/upload y flujo de `causar`) a un servicio testable y reutilizable.
+- **Routers**: `backend/routers/facturas.py` convertido en una capa de presentación ligera que delega en `FacturaService`, reduciendo la responsabilidad de la capa HTTP.
+- **Validación y compilación**: se ejecutó verificación de sintaxis (`python -m compileall services routers`) y los módulos compilados sin errores.
+- **Estado de tests**: intento de ejecución de la suite falló en el entorno actual porque `pytest` no está instalado; por eso las pruebas unitarias quedan pendientes de integrar en CI/local.
+
+### Motivo y ventajas
+- Separación de responsabilidades: HTTP, lógica de negocio y manejo de errores ahora están desacoplados.
+- Mejor cobertura en pruebas: `AlegraClient` y `FacturaService` pueden testearse por separado con mocks controlados.
+- Menor riesgo al desplegar: el refactor es no disruptivo — las firmas públicas de `alegra_service` y las rutas se mantienen.
+- Reutilización y mantenimiento: `AlegraClient` sirve como punto único para mejoras (caching, retries, logging) sin tocar la lógica de negocio.
+
+### Pendiente / Próximos pasos
+- Descomponer `backend/services/ingestion_service.py` en tres módulos:
+	- `backend/services/ingestion/extractor.py`: extracción y decodificación de ZIP/XML, detección de encoding y soporte para ZIP anidados.
+	- `backend/services/ingestion/processor.py`: orquestación del procesamiento, persistencia vía repositorios y manejo de errores/retry.
+	- `backend/services/ingestion/prefill.py`: lógica de prefill (IA, mapeos por NIT, llamadas a `AlegraClient`).
+	- Mantener un facade `backend/services/ingestion_service.py` que preserve la interfaz externa.
+- Añadir pruebas unitarias:
+	- `AlegraClient` (mock de `httpx`), `FacturaService` (mock de `AlegraClient` y repositorios) y helpers de extracción ZIP/XML.
+- Ajustar CI/Docker para instalar `pytest` y ejecutar la suite en pipeline.
+- Modularizar `backend/services/xml_parser.py` hacia una interfaz `DIANParser` reutilizable.
+- Considerar mejoras operativas (cache compartida tipo Redis, mover IMAP/IO bloqueante a workers/asíncrono).
+
+### Estado
+- Implementado: excepciones tipadas, `AlegraClient`, fachada `alegra_service`, `FacturaService`, y router `facturas` delgado.
+- Validado: compilación de módulos sin errores.
+- Pendiente: pruebas unitarias (bloqueadas por entorno), descomposición de `ingestion_service.py`, modularización de `xml_parser.py`.
+
+## [2026-04-14] - Cierre de Fase: descomposición de ingestion, parser DIAN modular y pruebas
+### Añadido / Modificado
+- **Descomposición de ingesta en 3 módulos**:
+	- `backend/services/ingestion/extractor.py`: extracción XML desde adjuntos y ZIP (incluye ZIP anidados y detección de codificación).
+	- `backend/services/ingestion/processor.py`: orquestación de parseo, prefill (config/IA), control de duplicados y persistencia.
+	- `backend/services/ingestion/prefill.py`: construcción de contexto de clasificación (categorías y centros de costo).
+	- `backend/services/ingestion/__init__.py`: exports del paquete.
+
+- **Facade compatible mantenido**:
+	- `backend/services/ingestion_service.py` conserva la API pública (`IngestionService`, `XMLDocument`, `ingestion_service`) y delega internamente en los módulos nuevos.
+	- Se preservó compatibilidad con imports existentes de routers/servicios y con monkeypatches de tests.
+
+- **Parser DIAN modularizado**:
+	- `backend/services/xml_parser.py` pasó de una función monolítica a `DIANParser` con métodos separados para:
+		- unwrap de `AttachedDocument`
+		- extracción de metadatos (NIT/nombre)
+		- extracción de totales e impuestos
+		- extracción y clasificación de retenciones
+		- cálculo de total neto pagadero
+		- extracción de items
+	- Se mantiene `parse_xml_dian(...)` como wrapper/facade compatible para no romper consumo actual.
+
+- **Pruebas unitarias nuevas**:
+	- `backend/tests/test_alegra_client.py`
+	- `backend/tests/test_factura_service.py`
+	- `backend/tests/test_xml_parser.py`
+
+### Validación
+- **Suite backend**: `python -m pytest -q` ejecutada exitosamente.
+	- Resultado: `9 passed`.
+- **Compilación**: `python -m compileall services routers tests` sin errores.
+
+### Hallazgos de entorno (Windows + Python 3.14)
+- Se detectó incompatibilidad al instalar `requirements.txt` con pins antiguos (`lxml==5.1.0` y stack de `pydantic==2.6.1`/`pydantic-core`) en Python 3.14.
+- Para validación local se usaron dependencias compatibles con 3.14 (`lxml>=6`, `fastapi`/`supabase`/`httpx` actuales, `pydantic-settings`).
+
+### Ventajas operativas
+- Menor acoplamiento y mayor mantenibilidad en ingesta.
+- Mejor testabilidad por separación extractor/processor/prefill.
+- Menor riesgo de regresión al mantener facade e interfaz pública.
+- Base lista para evolución (retries, observabilidad, paralelización) sin tocar capa HTTP.
+
+### Pendiente recomendado
+- Alinear `backend/requirements.txt` con versiones compatibles para Python 3.14 (o fijar versión de runtime soportada) para evitar fallos de instalación en nuevos entornos.
+
 ## [2026-04-13] - Correccion CORS y respuestas consistentes
 ### Corregido
 - **CORS en API**: Se reordeno el middleware para garantizar `Access-Control-Allow-Origin` en todas las respuestas, evitando bloqueos desde `http://localhost:3000`.

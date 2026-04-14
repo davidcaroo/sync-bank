@@ -14,6 +14,7 @@ export default function FacturaModal({
   if (!factura) return null
 
   const facturaEstado = String(factura.estado || '').toLowerCase()
+  const isRecausar = facturaEstado === 'procesado' || facturaEstado === 'causado' || facturaEstado === 'duplicado'
 
   const items = factura.items_factura || factura.items || []
   const subtotal = Number(factura.subtotal || 0)
@@ -285,11 +286,11 @@ export default function FacturaModal({
 
           <button
             onClick={onCausar}
-            disabled={loading || facturaEstado === 'procesado' || facturaEstado === 'causado' || facturaEstado === 'duplicado'}
+            disabled={loading}
             className="btn-success"
             id="btn-causar-alegra"
           >
-            {loading ? 'Enviando a Alegra…' : 'Causar en Alegra'}
+            {loading ? 'Enviando a Alegra…' : (isRecausar ? 'Recausar en Alegra' : 'Causar en Alegra')}
           </button>
         </div>
       </div>
