@@ -28,6 +28,8 @@ class IngestionService:
         apply_ai: bool,
         categories: list | None,
         cost_centers: list | None,
+        auto_apply_ai: bool = False,
+        preview_mode: bool = False,
     ) -> dict:
         processor = IngestionProcessor(
             parse_xml=parse_xml_dian,
@@ -43,6 +45,8 @@ class IngestionService:
             apply_ai=apply_ai,
             categories=categories,
             cost_centers=cost_centers,
+            auto_apply_ai=auto_apply_ai,
+            preview_mode=preview_mode,
         )
 
     async def build_prefill_context(self, *, apply_ai: bool) -> dict:

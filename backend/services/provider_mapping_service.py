@@ -174,6 +174,50 @@ class ProviderMappingService:
 
         return None
 
+    async def suggest_mapping_from_history(
+        self,
+        nit_proveedor: str,
+        *,
+        min_occurrences: int = 2,
+        min_share: float = 0.6,
+    ) -> Optional[dict]:
+        """Return a non-persistent historical suggestion for a provider.
+
+        This is less strict than the persisted mapping thresholds and is intended
+        for preview/autocomplete suggestions before upload/causation.
+        """
+        if not nit_proveedor:
+            return None
+
+        try:
+            counter, total = await self._historical.get_account_counts(nit_proveedor)
+        except Exception as exc:
+            self._logger.error("historical_suggestion_failed", extra={"nit": nit_proveedor, "error": str(exc)})
+            return None
+
+        if not counter or total <= 0:
+            return None
+
+        decision = evaluate_account_choice(
+            counter,
+            total,
+            min_occurrences=min_occurrences,
+            min_share=min_share,
+        )
+        if not decision:
+            return None
+
+        return {
+            "nit": nit_proveedor,
+            "cuenta": decision["cuenta"],
+            "confidence": decision["share"],
+            "source": "historical_suggestion",
+            "metrics": {
+                "total": decision["total"],
+                "count": decision["count"],
+            },
+        }
+
     async def recompute_all_mappings(
         self,
         *,

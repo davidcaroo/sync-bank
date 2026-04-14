@@ -279,6 +279,30 @@ export default function Facturas() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const normalizePreviewSource = (source) => {
+    if (source === 'config') return 'Configuración'
+    if (source === 'ai') return 'IA (umbral)'
+    if (source === 'ai_auto') return 'IA (auto-aplicada)'
+    if (source === 'ai_suggestion') return 'IA (sugerencia)'
+    if (source === 'none') return 'Sin sugerencia'
+    return source || 'Sin sugerencia'
+  }
+
+  const buildPreviewSuggestionText = (item) => {
+    const cuenta = item?.cuenta_contable_alegra || item?.suggested_cuenta_contable_alegra || '—'
+    const centro = item?.centro_costo_alegra || item?.suggested_centro_costo_alegra || '—'
+    const source = normalizePreviewSource(item?.prefill_source)
+    const confidence = item?.confidence
+    const confidenceText = typeof confidence === 'number' ? `${Math.round(confidence * 100)}%` : '—'
+    return {
+      cuenta,
+      centro,
+      source,
+      confidenceText,
+      descripcion: item?.descripcion || 'Ítem sin descripción',
+    }
+  }
+
   /* ------------------------------------------------------------------ */
   return (
     <div>
@@ -704,19 +728,75 @@ export default function Facturas() {
                           <th>Factura</th>
                           <th>Proveedor</th>
                           <th>Estado</th>
-                          <th>Detalle</th>
+                          <th>Resumen IA</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(uploadPreview.files || []).map((entry, idx) => (
-                          <tr key={`${entry.file_name || 'f'}-${idx}`}>
-                            <td className="text-sm">{entry.entry_name || entry.file_name || '—'}</td>
-                            <td className="text-sm fw-bold">{entry.factura_preview?.numero_factura || '—'}</td>
-                            <td className="text-sm">{entry.factura_preview?.nombre_proveedor || '—'}</td>
-                            <td><StatusBadge status={entry.status || 'pendiente'} /></td>
-                            <td className="text-sm text-muted">{entry.reason || '—'}</td>
-                          </tr>
-                        ))}
+                        {(uploadPreview.files || []).map((entry, idx) => {
+                          const previewItems = entry.factura_preview?.items || []
+                          const itemsWithSuggestion = previewItems.filter((item) => (
+                            item?.cuenta_contable_alegra
+                            || item?.centro_costo_alegra
+                            || item?.suggested_cuenta_contable_alegra
+                            || item?.suggested_centro_costo_alegra
+                          ))
+                          const sampleItems = previewItems.slice(0, 3).map(buildPreviewSuggestionText)
+
+                          return (
+                            <tr key={`${entry.file_name || 'f'}-${idx}`}>
+                              <td className="text-sm">{entry.entry_name || entry.file_name || '—'}</td>
+                              <td className="text-sm fw-bold">{entry.factura_preview?.numero_factura || '—'}</td>
+                              <td className="text-sm">{entry.factura_preview?.nombre_proveedor || '—'}</td>
+                              <td><StatusBadge status={entry.status || 'pendiente'} /></td>
+                              <td className="text-sm" style={{ minWidth: '320px' }}>
+                                {entry.reason ? (
+                                  <span className="text-muted">{entry.reason}</span>
+                                ) : (
+                                  <div style={{ display: 'grid', gap: '0.35rem' }}>
+                                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                      <span className="text-xs fw-bold text-muted">
+                                        Ítems: {previewItems.length}
+                                      </span>
+                                      <span className="text-xs fw-bold" style={{ color: '#1f7a3d' }}>
+                                        Con sugerencia: {itemsWithSuggestion.length}
+                                      </span>
+                                    </div>
+
+                                    {sampleItems.length > 0 ? sampleItems.map((item, i) => (
+                                      <div
+                                        key={`${entry.file_name || 'f'}-suggestion-${i}`}
+                                        style={{
+                                          background: '#f8f9fc',
+                                          border: '1px solid #e3e6f0',
+                                          borderRadius: '6px',
+                                          padding: '0.35rem 0.5rem',
+                                        }}
+                                      >
+                                        <div className="text-xs fw-bold" style={{ color: '#5a5c69', marginBottom: '2px' }}>
+                                          {item.descripcion}
+                                        </div>
+                                        <div className="text-xs text-muted">
+                                          Cuenta: <strong>{item.cuenta}</strong> · Centro: <strong>{item.centro}</strong>
+                                        </div>
+                                        <div className="text-xs text-muted">
+                                          Fuente: {item.source} · Confianza: {item.confidenceText}
+                                        </div>
+                                      </div>
+                                    )) : (
+                                      <span className="text-muted text-xs">Sin información de sugerencias</span>
+                                    )}
+
+                                    {previewItems.length > 3 && (
+                                      <span className="text-xs text-muted">
+                                        + {previewItems.length - 3} ítem(s) adicionales en esta factura.
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

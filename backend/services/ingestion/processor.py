@@ -28,6 +28,8 @@ class IngestionProcessor:
         apply_ai: bool,
         categories: list | None,
         cost_centers: list | None,
+        auto_apply_ai: bool = False,
+        preview_mode: bool = False,
     ) -> dict:
         try:
             factura = self._parse_xml(xml_doc.xml_text)
@@ -39,59 +41,129 @@ class IngestionProcessor:
                 "reason": f"Error de parser XML: {exc}",
             }
 
-        await self._run_in_executor(
-            lambda: self._sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor)
-        )
+        if persist:
+            await self._run_in_executor(
+                lambda: self._sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor)
+            )
 
         prefilled_items = []
+        preview_items = []
+        ai_cache = {}
 
         config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+        historical_hint = None
 
         if not config:
             try:
                 from services.provider_mapping_service import provider_mapping_service
 
-                await provider_mapping_service.compute_and_save_mapping(
-                    factura.nit_proveedor, factura.nombre_proveedor
-                )
-                config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+                if preview_mode:
+                    # Keep preview fast: use local historical hint only.
+                    historical_hint = await provider_mapping_service.suggest_mapping_from_history(
+                        factura.nit_proveedor,
+                        min_occurrences=2,
+                        min_share=0.6,
+                    )
+                else:
+                    await provider_mapping_service.compute_and_save_mapping(
+                        factura.nit_proveedor, factura.nombre_proveedor
+                    )
+                    config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+                    if not config:
+                        historical_hint = await provider_mapping_service.suggest_mapping_from_history(
+                            factura.nit_proveedor,
+                            min_occurrences=2,
+                            min_share=0.6,
+                        )
             except Exception:
                 config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
 
         for item in factura.items:
             prefill_source = "none"
-            confidence = 0.0
+            confidence = None
+            suggested_cuenta = None
+            suggested_centro = None
+
+            cuenta_to_save = None
+            centro_to_save = None
 
             if config:
-                item.cuenta_contable_alegra = config["id_cuenta_alegra"]
-                item.centro_costo_alegra = config.get("id_centro_costo_alegra")
+                cuenta_to_save = config.get("id_cuenta_alegra")
+                centro_to_save = config.get("id_centro_costo_alegra")
                 prefill_source = "config"
+                try:
+                    confidence = float(config.get("confianza") or 1.0)
+                except Exception:
+                    confidence = 1.0
+            elif historical_hint and historical_hint.get("cuenta"):
+                cuenta_to_save = historical_hint.get("cuenta")
+                centro_to_save = None
+                prefill_source = "historical"
+                try:
+                    confidence = float(historical_hint.get("confidence") or 0.0)
+                except Exception:
+                    confidence = 0.0
             elif apply_ai:
-                classification = await clasificar_item(item.descripcion, categories or [], cost_centers or [])
-                confidence = float(classification.get("confianza") or 0.0)
-                if confidence < settings.AI_CONFIDENCE_THRESHOLD:
-                    item.cuenta_contable_alegra = None
-                    item.centro_costo_alegra = None
-                    prefill_source = "none"
+                desc_key = (item.descripcion or "").strip().lower()
+                if desc_key in ai_cache:
+                    classification = ai_cache[desc_key]
                 else:
-                    item.cuenta_contable_alegra = classification.get("cuenta_id")
-                    item.centro_costo_alegra = classification.get("centro_costo_id")
-                    prefill_source = "ai"
+                    classification = await clasificar_item(item.descripcion, categories or [], cost_centers or [])
+                    ai_cache[desc_key] = classification
+                suggested_cuenta = classification.get("cuenta_id")
+                suggested_centro = classification.get("centro_costo_id")
+                try:
+                    confidence = float(classification.get("confianza") or 0.0)
+                except Exception:
+                    confidence = 0.0
 
-            prefilled_items.append(
-                {
-                    "descripcion": item.descripcion,
-                    "cantidad": item.cantidad,
-                    "precio_unitario": item.precio_unitario,
-                    "descuento": item.descuento,
-                    "iva_porcentaje": item.iva_porcentaje,
-                    "total_linea": item.total_linea,
-                    "cuenta_contable_alegra": item.cuenta_contable_alegra,
-                    "centro_costo_alegra": item.centro_costo_alegra,
-                    "prefill_source": prefill_source,
-                    "confidence": confidence,
-                }
-            )
+                if confidence is not None and confidence >= settings.AI_CONFIDENCE_THRESHOLD:
+                    cuenta_to_save = suggested_cuenta
+                    centro_to_save = suggested_centro
+                    prefill_source = "ai"
+                else:
+                    if auto_apply_ai and (suggested_cuenta or suggested_centro):
+                        cuenta_to_save = suggested_cuenta
+                        centro_to_save = suggested_centro
+                        prefill_source = "ai_auto"
+                    else:
+                        prefill_source = "ai_suggestion" if (suggested_cuenta or suggested_centro) else "none"
+
+            # Build preview item (contains suggestions and confidence)
+            preview_item = {
+                "descripcion": item.descripcion,
+                "cantidad": item.cantidad,
+                "precio_unitario": item.precio_unitario,
+                "descuento": item.descuento,
+                "iva_porcentaje": item.iva_porcentaje,
+                "total_linea": item.total_linea,
+                "cuenta_contable_alegra": cuenta_to_save,
+                "centro_costo_alegra": centro_to_save,
+                "prefill_source": prefill_source,
+                "confidence": confidence,
+            }
+
+            if prefill_source == "ai_suggestion":
+                preview_item["suggested_cuenta_contable_alegra"] = suggested_cuenta
+                preview_item["suggested_centro_costo_alegra"] = suggested_centro
+
+            preview_items.append(preview_item)
+
+            # Build saved item payload (only include allowed keys)
+            save_item = {
+                "descripcion": item.descripcion,
+                "cantidad": item.cantidad,
+                "precio_unitario": item.precio_unitario,
+                "descuento": item.descuento,
+                "iva_porcentaje": item.iva_porcentaje,
+                "total_linea": item.total_linea,
+                "cuenta_contable_alegra": cuenta_to_save,
+                "centro_costo_alegra": centro_to_save,
+                "prefill_source": prefill_source,
+                "confidence": confidence,
+            }
+
+            prefilled_items.append(save_item)
 
         duplicate = bool(await self._run_in_executor(lambda: self._find_factura_by_cufe(factura.cufe))) if factura.cufe else False
 
@@ -113,7 +185,7 @@ class IngestionProcessor:
             "total_neto": factura.total,
             "total": factura.total,
             "moneda": factura.moneda,
-            "items": prefilled_items,
+            "items": preview_items,
         }
 
         if not persist:
@@ -161,4 +233,5 @@ class IngestionProcessor:
             "nit_proveedor": factura.nit_proveedor,
             "nombre_proveedor": factura.nombre_proveedor,
             "estado": "duplicado" if is_duplicate else "pendiente",
+            "factura_preview": factura_preview,
         }

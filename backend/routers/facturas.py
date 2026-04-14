@@ -17,17 +17,25 @@ class CausarFacturaRequest(BaseModel):
 
 
 @router.post("/preview-upload")
-async def preview_upload_facturas(files: list[UploadFile] = File(...), apply_ai: bool = True):
+async def preview_upload_facturas(
+    files: list[UploadFile] = File(...), apply_ai: bool = True, auto_apply_ai: bool = False
+):
     if not files:
         raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
-    return await factura_service.preview_upload_facturas(files, apply_ai=apply_ai)
+    return await factura_service.preview_upload_facturas(
+        files, apply_ai=apply_ai, auto_apply_ai=auto_apply_ai
+    )
 
 
 @router.post("/upload")
-async def upload_facturas(files: list[UploadFile] = File(...), apply_ai: bool = True):
+async def upload_facturas(
+    files: list[UploadFile] = File(...), apply_ai: bool = True, auto_apply_ai: bool = False
+):
     if not files:
         raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
-    return await factura_service.upload_facturas(files, apply_ai=apply_ai)
+    return await factura_service.upload_facturas(
+        files, apply_ai=apply_ai, auto_apply_ai=auto_apply_ai
+    )
 
 @router.get("/stats")
 async def get_facturas_stats():

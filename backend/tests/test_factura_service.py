@@ -29,7 +29,7 @@ async def test_preview_upload_facturas_summary(monkeypatch):
     async def fake_prefill_context(*, apply_ai):
         return {"categories": [], "cost_centers": []}
 
-    async def fake_process(xml_doc, *, persist, apply_ai, categories, cost_centers):
+    async def fake_process(xml_doc, *, persist, apply_ai, categories, cost_centers, auto_apply_ai, preview_mode):
         if xml_doc.entry_name == "a.xml":
             return {"status": "valid", "file_name": "a.xml", "entry_name": "a.xml"}
         return {
@@ -43,7 +43,11 @@ async def test_preview_upload_facturas_summary(monkeypatch):
     monkeypatch.setattr("services.factura_service.ingestion_service.build_prefill_context", fake_prefill_context)
     monkeypatch.setattr("services.factura_service.ingestion_service.process_xml_document", fake_process)
 
-    result = await service.preview_upload_facturas(files=[object(), object()], apply_ai=False)
+    result = await service.preview_upload_facturas(
+        files=[object(), object()],
+        apply_ai=False,
+        auto_apply_ai=False,
+    )
 
     assert result["summary"]["total_files"] == 2
     assert result["summary"]["total_xml"] == 2
@@ -63,3 +67,29 @@ def test_normalize_items_prefill_defaults():
     assert normalized[0]["prefill_source"] == "unknown"
     assert normalized[0]["confidence"] is None
     assert normalized[1]["prefill_source"] == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_preview_upload_facturas_forwards_auto_apply_ai(monkeypatch):
+    service = FacturaService()
+
+    docs = [XMLDocument(file_name="a.xml", entry_name="a.xml", xml_text="<xml/>")]
+    seen = {"auto_apply_ai": None}
+
+    async def fake_extract(files):
+        return {"documents": docs, "errors": []}
+
+    async def fake_prefill_context(*, apply_ai):
+        return {"categories": [], "cost_centers": []}
+
+    async def fake_process(xml_doc, *, persist, apply_ai, categories, cost_centers, auto_apply_ai, preview_mode):
+        seen["auto_apply_ai"] = auto_apply_ai
+        assert preview_mode is True
+        return {"status": "valid", "file_name": "a.xml", "entry_name": "a.xml"}
+
+    monkeypatch.setattr("services.factura_service.ingestion_service.extract_xml_documents_from_upload", fake_extract)
+    monkeypatch.setattr("services.factura_service.ingestion_service.build_prefill_context", fake_prefill_context)
+    monkeypatch.setattr("services.factura_service.ingestion_service.process_xml_document", fake_process)
+
+    await service.preview_upload_facturas(files=[object()], apply_ai=True, auto_apply_ai=True)
+    assert seen["auto_apply_ai"] is True

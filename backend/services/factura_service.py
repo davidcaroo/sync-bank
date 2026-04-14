@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+import asyncio
 
 import httpx
 from dateutil import parser as date_parser
@@ -198,7 +199,7 @@ class FacturaService:
             "errors": len([item for item in results if item.get("status") in {"error", "invalid"}]),
         }
 
-    async def preview_upload_facturas(self, files, *, apply_ai: bool = True):
+    async def preview_upload_facturas(self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False):
         extracted = await ingestion_service.extract_xml_documents_from_upload(files)
         documents = extracted.get("documents") or []
         errors = extracted.get("errors") or []
@@ -206,15 +207,23 @@ class FacturaService:
         prefill_context = await ingestion_service.build_prefill_context(apply_ai=apply_ai)
 
         results = list(errors)
-        for xml_doc in documents:
-            result = await ingestion_service.process_xml_document(
-                xml_doc,
-                persist=False,
-                apply_ai=apply_ai,
-                categories=prefill_context.get("categories"),
-                cost_centers=prefill_context.get("cost_centers"),
-            )
-            results.append(result)
+        sem = asyncio.Semaphore(3)
+
+        async def _process_preview_doc(xml_doc):
+            async with sem:
+                return await ingestion_service.process_xml_document(
+                    xml_doc,
+                    persist=False,
+                    apply_ai=apply_ai,
+                    categories=prefill_context.get("categories"),
+                    cost_centers=prefill_context.get("cost_centers"),
+                    auto_apply_ai=auto_apply_ai,
+                    preview_mode=True,
+                )
+
+        if documents:
+            preview_results = await asyncio.gather(*[_process_preview_doc(doc) for doc in documents])
+            results.extend(preview_results)
 
         return {
             "summary": self._preview_summary(
@@ -225,7 +234,7 @@ class FacturaService:
             "files": results,
         }
 
-    async def upload_facturas(self, files, *, apply_ai: bool = True):
+    async def upload_facturas(self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False):
         extracted = await ingestion_service.extract_xml_documents_from_upload(files)
         documents = extracted.get("documents") or []
         errors = extracted.get("errors") or []
@@ -240,6 +249,8 @@ class FacturaService:
                 apply_ai=apply_ai,
                 categories=prefill_context.get("categories"),
                 cost_centers=prefill_context.get("cost_centers"),
+                auto_apply_ai=auto_apply_ai,
+                preview_mode=False,
             )
             results.append(result)
 

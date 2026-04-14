@@ -15,16 +15,26 @@ async def clasificar_item(descripcion: str, cuentas: list, centros_costo: list |
             )
             if response.status_code == 200:
                 payload = response.json()
+                confianza = float(payload.get("confianza") or 0.0)
+                cuenta_id = payload.get("cuenta_id")
+                centro_id = payload.get("centro_costo_id")
+
+                # Avoid presenting default fallback account as a real AI suggestion
+                # when confidence is effectively null.
+                if confianza <= 0.0:
+                    cuenta_id = None
+                    centro_id = None
+
                 return {
-                    "cuenta_id": payload.get("cuenta_id") or settings.ALEGRA_CUENTA_DEFAULT_GASTOS,
-                    "centro_costo_id": payload.get("centro_costo_id") or None,
-                    "confianza": payload.get("confianza", 0.0),
+                    "cuenta_id": cuenta_id,
+                    "centro_costo_id": centro_id,
+                    "confianza": confianza,
                 }
     except Exception as e:
         logger.error("ai_service_error", extra={"error": str(e)})
     
     return {
-        "cuenta_id": settings.ALEGRA_CUENTA_DEFAULT_GASTOS,
+        "cuenta_id": None,
         "centro_costo_id": None,
         "confianza": 0.0,
     }
