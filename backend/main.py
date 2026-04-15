@@ -1,8 +1,12 @@
 import logging
 import json
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from config import settings
+from observability.telemetry import init_telemetry
 from routers import facturas, proceso, config, logs, contactos, providers
 from scheduler import start_scheduler
 from middleware.metrics import RequestTimingMiddleware
@@ -26,6 +30,10 @@ class JsonLogFormatter(logging.Formatter):
             payload["source"] = record.source
         if hasattr(record, "elapsed_ms"):
             payload["elapsed_ms"] = record.elapsed_ms
+        if hasattr(record, "job_id"):
+            payload["job_id"] = record.job_id
+        if hasattr(record, "factura_id"):
+            payload["factura_id"] = record.factura_id
         return json.dumps(payload, ensure_ascii=True)
 
 
@@ -70,7 +78,15 @@ app.include_router(providers.router, prefix="/api")
 
 @app.on_event("startup")
 async def startup_event():
+    init_telemetry()
     start_scheduler()
+
+
+@app.get("/metrics")
+def metrics():
+    if not settings.METRICS_ENABLED:
+        return JSONResponse(status_code=404, content={"message": "metrics disabled"})
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.get("/")
 def read_root():

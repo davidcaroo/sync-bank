@@ -10,10 +10,32 @@ services:
     environment:
       - ENV=dev
       - TZ=America/Bogota
+      - SUPABASE_REQUIRE_SERVICE_KEY=false
     env_file:
       - .env
     depends_on:
       - ai-service
+      - redis
+
+  backend-worker:
+    build: ./backend
+    command: ["dramatiq", "workers.tasks"]
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENV=dev
+      - TZ=America/Bogota
+      - SUPABASE_REQUIRE_SERVICE_KEY=false
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
 
   frontend:
     build: ./frontend

@@ -59,6 +59,23 @@ async def get_facturas(
         hasta=hasta,
     )
 
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(job_id: str):
+    return await factura_service.get_job_status(job_id)
+
+
+@router.post("/{factura_id}/causar-async", status_code=202)
+async def causar_factura_async(factura_id: str, payload: CausarFacturaRequest | None = None):
+    overrides_map = {}
+    if payload and payload.item_overrides:
+        for item in payload.item_overrides:
+            overrides_map[str(item.item_id)] = {
+                "cuenta_contable_alegra": item.cuenta_contable_alegra,
+                "centro_costo_alegra": item.centro_costo_alegra,
+            }
+    return await factura_service.enqueue_causar_factura(factura_id, overrides_map)
+
 @router.get("/{factura_id}")
 async def get_factura(factura_id: str):
     return await factura_service.get_factura(factura_id)

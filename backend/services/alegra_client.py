@@ -1,5 +1,6 @@
 import base64
 import re
+from typing import Callable
 
 import httpx
 
@@ -205,7 +206,7 @@ def _build_bill_observations(factura: FacturaDIAN, max_length: int = 500) -> str
 
 
 class AlegraClient:
-    def __init__(self):
+    def __init__(self, http_client_factory: Callable[[], httpx.AsyncClient] | None = None):
         auth_str = f"{settings.ALEGRA_EMAIL}:{settings.ALEGRA_TOKEN}"
         self.auth_header = base64.b64encode(auth_str.encode()).decode()
         self.headers = {
@@ -216,6 +217,9 @@ class AlegraClient:
         self._categories = None
         self._cost_centers = None
         self._taxes = None
+        self._http_client_factory = http_client_factory or (
+            lambda: httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+        )
 
     def _flatten_categories(self, nodes):
         result = []
@@ -606,7 +610,7 @@ class AlegraClient:
         if not numero_factura:
             return None
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        async with self._http_client_factory() as client:
             provider = await self.find_provider_contact_by_nit(client, nit_proveedor or "")
             provider_id = str(provider.get("id")) if isinstance(provider, dict) and provider.get("id") is not None else None
 
@@ -650,7 +654,7 @@ class AlegraClient:
         if not factura.total or factura.total <= 0:
             raise RemoteAPIError("No se puede causar en Alegra: El total de la factura es invalido o cero.")
 
-        async with httpx.AsyncClient() as client:
+        async with self._http_client_factory() as client:
             provider_id = await self.get_provider_id(client, factura.nit_proveedor, factura.nombre_proveedor)
             taxes = await self.get_taxes(client)
             now_local = now_bogota()

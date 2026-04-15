@@ -1,6 +1,7 @@
 from services.ingestion.extractor import IngestionExtractor, XMLDocument
 from services.ingestion.prefill import IngestionPrefill
 from services.ingestion.processor import IngestionProcessor
+from repositories.ingestion_adapters import SyncFacturaRepositoryAdapter, SyncProviderConfigRepositoryAdapter
 from repositories.config_repository import (
     get_config_cuenta,
     sync_config_proveedor_nombre,
@@ -31,13 +32,21 @@ class IngestionService:
         auto_apply_ai: bool = False,
         preview_mode: bool = False,
     ) -> dict:
-        processor = IngestionProcessor(
-            parse_xml=parse_xml_dian,
+        factura_repository = SyncFacturaRepositoryAdapter(
+            run_in_executor=run_in_executor,
+            find_factura_by_cufe=find_factura_by_cufe,
+            save_factura=save_factura,
+        )
+        provider_config_repository = SyncProviderConfigRepositoryAdapter(
             run_in_executor=run_in_executor,
             get_config_cuenta=get_config_cuenta,
             sync_config_proveedor_nombre=sync_config_proveedor_nombre,
-            find_factura_by_cufe=find_factura_by_cufe,
-            save_factura=save_factura,
+        )
+
+        processor = IngestionProcessor(
+            parse_xml=parse_xml_dian,
+            factura_repository=factura_repository,
+            provider_config_repository=provider_config_repository,
         )
         return await processor.process_xml_document(
             xml_doc,

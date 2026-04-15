@@ -1,7 +1,9 @@
 import re
 
 from dateutil import parser
+from dateutil.parser import ParserError
 from lxml import etree
+from lxml.etree import XMLSyntaxError
 
 from models.factura import FacturaDIAN, FacturaItem
 from services.timezone_service import now_bogota
@@ -22,7 +24,7 @@ def _to_float(value: str | None, default: float = 0.0) -> float:
     raw = raw.replace(",", "")
     try:
         return float(raw)
-    except Exception:
+    except ValueError:
         return default
 
 class DIANParser:
@@ -52,7 +54,7 @@ class DIANParser:
         items = self._extract_items(tree)
         dt_emision = self._parse_issue_date(fecha_emision_raw)
 
-        return FacturaDIAN(
+        factura = FacturaDIAN(
             cufe=cufe,
             numero_factura=numero,
             fecha_emision=dt_emision,
@@ -68,6 +70,7 @@ class DIANParser:
             xml_raw=xml_content,
             items=items,
         )
+        return factura.normalize()
 
     def _unwrap_attached_document(self, tree):
         if not tree.tag.endswith("AttachedDocument"):
@@ -91,7 +94,7 @@ class DIANParser:
                 embedded_xml = description_nodes[0].text
             if embedded_xml and "<" in embedded_xml:
                 return etree.fromstring(embedded_xml.encode("utf-8"))
-        except Exception:
+        except (XMLSyntaxError, ValueError):
             return tree
 
         return tree
@@ -299,7 +302,7 @@ class DIANParser:
     def _parse_issue_date(self, fecha_emision_raw: str | None):
         try:
             return parser.parse(fecha_emision_raw) if fecha_emision_raw else now_bogota()
-        except Exception:
+        except (ParserError, TypeError, ValueError):
             return now_bogota()
 
 

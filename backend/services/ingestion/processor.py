@@ -1,4 +1,5 @@
 from config import settings
+from services.ingestion.contracts import FacturaRepositoryPort, ProviderConfigRepositoryPort
 from services.ai_service import clasificar_item
 
 
@@ -7,18 +8,12 @@ class IngestionProcessor:
         self,
         *,
         parse_xml,
-        run_in_executor,
-        get_config_cuenta,
-        sync_config_proveedor_nombre,
-        find_factura_by_cufe,
-        save_factura,
+        factura_repository: FacturaRepositoryPort,
+        provider_config_repository: ProviderConfigRepositoryPort,
     ) -> None:
         self._parse_xml = parse_xml
-        self._run_in_executor = run_in_executor
-        self._get_config_cuenta = get_config_cuenta
-        self._sync_config_proveedor_nombre = sync_config_proveedor_nombre
-        self._find_factura_by_cufe = find_factura_by_cufe
-        self._save_factura = save_factura
+        self._factura_repository = factura_repository
+        self._provider_config_repository = provider_config_repository
 
     async def process_xml_document(
         self,
@@ -42,15 +37,16 @@ class IngestionProcessor:
             }
 
         if persist:
-            await self._run_in_executor(
-                lambda: self._sync_config_proveedor_nombre(factura.nit_proveedor, factura.nombre_proveedor)
+            await self._provider_config_repository.sync_proveedor_nombre(
+                factura.nit_proveedor,
+                factura.nombre_proveedor,
             )
 
         prefilled_items = []
         preview_items = []
         ai_cache = {}
 
-        config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+        config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
         historical_hint = None
 
         if not config:
@@ -68,7 +64,7 @@ class IngestionProcessor:
                     await provider_mapping_service.compute_and_save_mapping(
                         factura.nit_proveedor, factura.nombre_proveedor
                     )
-                    config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+                    config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
                     if not config:
                         historical_hint = await provider_mapping_service.suggest_mapping_from_history(
                             factura.nit_proveedor,
@@ -76,7 +72,7 @@ class IngestionProcessor:
                             min_share=0.6,
                         )
             except Exception:
-                config = await self._run_in_executor(lambda: self._get_config_cuenta(factura.nit_proveedor))
+                config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
 
         for item in factura.items:
             prefill_source = "none"
@@ -165,7 +161,7 @@ class IngestionProcessor:
 
             prefilled_items.append(save_item)
 
-        duplicate = bool(await self._run_in_executor(lambda: self._find_factura_by_cufe(factura.cufe))) if factura.cufe else False
+        duplicate = bool(await self._factura_repository.find_by_cufe(factura.cufe)) if factura.cufe else False
 
         factura_preview = {
             "cufe": factura.cufe,
@@ -201,12 +197,7 @@ class IngestionProcessor:
         factura_payload["estado"] = "pendiente"
 
         try:
-            save_result = await self._run_in_executor(
-                lambda: self._save_factura(
-                    factura_payload,
-                    prefilled_items,
-                )
-            )
+            save_result = await self._factura_repository.save_factura(factura_payload, prefilled_items)
         except Exception as exc:
             return {
                 "file_name": xml_doc.file_name,
