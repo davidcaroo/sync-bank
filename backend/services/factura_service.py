@@ -14,6 +14,7 @@ from repositories.job_repository import create_or_get_job, get_job as repo_get_j
 from repositories.db_utils import run_in_executor
 from services.factura_contracts import CausacionRepositoryPort, FacturaRepositoryPort
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
+from services.errors import RemoteAPIError
 from services.ingestion_service import ingestion_service
 from services.job_dispatcher import enqueue_causar_factura
 from services.provider_mapping_service import provider_mapping_service
@@ -600,6 +601,39 @@ class FacturaService:
                     "message": str(exc),
                     "code": "DUPLICADO_ALEGRA",
                     "alegra_bill_id": None,
+                },
+            )
+        except RemoteAPIError as exc:
+            error_text = str(exc).strip() or repr(exc)
+            await self._factura_repository.update_factura_fields(factura_id, {"estado": "error"})
+            try:
+                await self._causacion_repository.save_causacion(
+                    {
+                        "factura_id": factura_id,
+                        "alegra_bill_id": None,
+                        "alegra_response": {
+                            "error": error_text,
+                            "status_code": exc.status_code,
+                            "payload": exc.payload,
+                        },
+                        "estado": "fallido",
+                        "intentos": 1,
+                        "error_msg": error_text,
+                    }
+                )
+            except Exception as log_exc:
+                logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
+            logger.error(
+                "causacion_error",
+                extra={"factura_id": factura_id, "error": error_text, "status": exc.status_code},
+            )
+            raise HTTPException(
+                status_code=exc.status_code or 502,
+                detail={
+                    "message": "Error Alegra API al crear Bill",
+                    "error": error_text,
+                    "status_code": exc.status_code,
+                    "payload": exc.payload,
                 },
             )
         except Exception as exc:

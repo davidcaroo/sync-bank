@@ -1,22 +1,32 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
 import json
 import asyncio
 import logging
-import re
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 # The ollama client resolves host on import in some versions.
 os.environ.setdefault("OLLAMA_HOST", OLLAMA_URL)
 import ollama
 
+from llm_utils import extract_json_object
+from pdf_extractor import extract_pdf_text
+from pdf_mapper import map_text_to_facturas
+from pdf_models import ExtraerPdfResponse
+
 app = FastAPI(title="Sync-bank AI Service")
 logger = logging.getLogger("ai-service")
 
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "10"))
+PDF_MAX_BYTES = int(os.getenv("PDF_MAX_BYTES", "15000000"))
+PDF_MAX_PAGES = int(os.getenv("PDF_MAX_PAGES", "5"))
+PDF_OCR_LANG = os.getenv("PDF_OCR_LANG", "spa")
+PDF_MIN_TEXT_CHARS = int(os.getenv("PDF_MIN_TEXT_CHARS", "30"))
+PDF_MAX_PROMPT_CHARS = int(os.getenv("PDF_MAX_PROMPT_CHARS", "12000"))
+PDF_RETRY_PROMPT_CHARS = int(os.getenv("PDF_RETRY_PROMPT_CHARS", "4000"))
 
 class ClasificarRequest(BaseModel):
     descripcion: str
@@ -30,33 +40,6 @@ class ClasificarResponse(BaseModel):
     centro_costo_nombre: Optional[str] = None
     confianza: float
 
-
-def _extract_json_object(text: str) -> dict:
-    content = (text or "").strip()
-    if not content:
-        raise ValueError("Respuesta vacia del modelo")
-
-    if "```json" in content:
-        content = content.split("```json", 1)[1].split("```", 1)[0].strip()
-    elif "```" in content:
-        content = content.split("```", 1)[1].split("```", 1)[0].strip()
-
-    try:
-        parsed = json.loads(content)
-        if isinstance(parsed, dict):
-            return parsed
-    except json.JSONDecodeError:
-        pass
-
-    # Fallback: recover first JSON object from mixed text.
-    match = re.search(r"\{.*\}", content, re.DOTALL)
-    if not match:
-        raise ValueError("No se encontro JSON en la respuesta del modelo")
-
-    parsed = json.loads(match.group(0))
-    if not isinstance(parsed, dict):
-        raise ValueError("El JSON de respuesta no es un objeto")
-    return parsed
 
 @app.post("/clasificar", response_model=ClasificarResponse)
 async def clasificar(req: ClasificarRequest):
@@ -94,7 +77,7 @@ async def clasificar(req: ClasificarRequest):
         )
 
         content = response.get("message", {}).get("content", "")
-        parsed = _extract_json_object(content)
+        parsed = extract_json_object(content)
         confianza = float(parsed.get("confianza", 0.0))
         confianza = max(0.0, min(confianza, 1.0))
 
@@ -122,6 +105,54 @@ async def health():
         return {"status": "ok", "ollama": "connected", "models": models}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.post("/extraer-pdf", response_model=ExtraerPdfResponse)
+async def extraer_pdf(file: UploadFile = File(...), preview: bool = True):
+    filename = file.filename or "sin_nombre"
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF")
+
+    try:
+        content = await file.read()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer archivo: {exc}")
+
+    try:
+        extraction = await asyncio.to_thread(
+            extract_pdf_text,
+            content,
+            max_pages=PDF_MAX_PAGES,
+            max_bytes=PDF_MAX_BYTES,
+            min_text_chars=PDF_MIN_TEXT_CHARS,
+            ocr_lang=PDF_OCR_LANG,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except Exception as exc:
+        logger.exception("pdf_extraction_error", extra={"error": str(exc)})
+        raise HTTPException(status_code=500, detail="Error extrayendo PDF")
+
+    raw_text = "\n\n".join([page.text for page in extraction.pages if page.text])
+    facturas, confianza, warnings = await map_text_to_facturas(
+        raw_text,
+        model=OLLAMA_MODEL,
+        timeout_seconds=OLLAMA_TIMEOUT_SECONDS,
+        max_chars=PDF_MAX_PROMPT_CHARS,
+        retry_timeout_seconds=OLLAMA_TIMEOUT_SECONDS,
+        retry_max_chars=PDF_RETRY_PROMPT_CHARS,
+    )
+
+    if preview is False:
+        warnings.append("persistencia_no_implementada")
+
+    return ExtraerPdfResponse(
+        facturas=facturas,
+        confianza=confianza,
+        warnings=warnings,
+        raw_text=raw_text,
+        pages=extraction.page_count,
+        ocr_used=extraction.ocr_used,
+    )
 
 if __name__ == "__main__":
     import uvicorn

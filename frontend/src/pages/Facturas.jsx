@@ -13,11 +13,14 @@ import FacturaModal from '../components/FacturaModal'
 import { StatusBadge } from '../components/DashboardBase'
 import {
   causarFactura,
+  confirmarPdfFacturas,
+  extraerPdf,
   getAlegraCatalogo,
   getFacturaById,
   getFacturas,
   isApiConfigured,
   previewFacturasUpload,
+  previewPdfFacturas,
   uploadFacturas,
 } from '../lib/api'
 import { useToast } from '../components/ToastProvider'
@@ -37,10 +40,15 @@ export default function Facturas() {
   const [causarLoading, setCausarLoading] = useState(false)
   const [error, setError] = useState(null)
   const [uploadFilesState, setUploadFilesState] = useState([])
+  const [uploadMode, setUploadMode] = useState('xml')
+  const [pdfFile, setPdfFile] = useState(null)
   const [uploadApplyAi, setUploadApplyAi] = useState(true)
   const [uploadPreview, setUploadPreview] = useState(null)
   const [uploadPreviewLoading, setUploadPreviewLoading] = useState(false)
   const [uploadSaving, setUploadSaving] = useState(false)
+  const [pdfPreview, setPdfPreview] = useState(null)
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false)
+  const [pdfConfirming, setPdfConfirming] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
@@ -106,6 +114,14 @@ export default function Facturas() {
   const buildUploadFormData = () => {
     const formData = new FormData()
     uploadFilesState.forEach((file) => formData.append('files', file))
+    return formData
+  }
+
+  const buildPdfFormData = () => {
+    const formData = new FormData()
+    if (pdfFile) {
+      formData.append('file', pdfFile)
+    }
     return formData
   }
 
@@ -234,6 +250,62 @@ export default function Facturas() {
     }
   }
 
+  const handlePreviewPdf = async () => {
+    if (!pdfFile) {
+      toast.warning('Selecciona un PDF.');
+      return
+    }
+    setPdfPreviewLoading(true)
+    try {
+      const extraction = await extraerPdf(buildPdfFormData(), true)
+      const extractedFacturas = extraction?.data?.facturas || []
+      if (!extractedFacturas.length) {
+        setPdfPreview({ extraction: extraction?.data, preview: null })
+        toast.warning('No se detectaron facturas en el PDF.')
+        return
+      }
+      const previewResponse = await previewPdfFacturas({
+        facturas: extractedFacturas,
+        apply_ai: uploadApplyAi,
+        auto_apply_ai: false,
+      })
+      setPdfPreview({ extraction: extraction?.data, preview: previewResponse?.data })
+      toast.success('Previsualización PDF generada.')
+    } catch (err) {
+      toast.error(getBackendErrorMessage(err, 'No se pudo previsualizar el PDF.'))
+    } finally {
+      setPdfPreviewLoading(false)
+    }
+  }
+
+  const handleConfirmPdf = async () => {
+    const extractedFacturas = pdfPreview?.extraction?.facturas || []
+    if (!extractedFacturas.length) {
+      toast.warning('No hay facturas para confirmar.')
+      return
+    }
+    setPdfConfirming(true)
+    try {
+      const response = await confirmarPdfFacturas({
+        facturas: extractedFacturas,
+        apply_ai: uploadApplyAi,
+        auto_apply_ai: false,
+      })
+      const summary = response?.data?.summary || {}
+      toast.success(`Carga PDF: ${summary.created || 0} creadas, ${summary.duplicates || 0} duplicadas, ${summary.errors || 0} con error.`)
+      setPdfPreview(null)
+      setPdfFile(null)
+      setShowUploadModal(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      await fetchData()
+      setPage(1)
+    } catch (err) {
+      toast.error(getBackendErrorMessage(err, 'No se pudo confirmar el PDF.'))
+    } finally {
+      setPdfConfirming(false)
+    }
+  }
+
   const handleUploadFacturas = async () => {
     if (!uploadFilesState.length) { toast.warning('Selecciona al menos un XML o ZIP.'); return }
     setUploadSaving(true)
@@ -268,6 +340,11 @@ export default function Facturas() {
   }, [])
 
   const handleFilesSelected = (files) => {
+    if (uploadMode === 'pdf') {
+      const pdf = Array.from(files).find(f => f.name.toLowerCase().endsWith('.pdf'))
+      setPdfFile(pdf || null)
+      return
+    }
     const validFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.xml') || f.name.toLowerCase().endsWith('.zip'))
     setUploadFilesState(validFiles)
   }
@@ -276,6 +353,17 @@ export default function Facturas() {
     setShowUploadModal(false)
     setUploadFilesState([])
     setUploadPreview(null)
+    setPdfFile(null)
+    setPdfPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleModeChange = (mode) => {
+    setUploadMode(mode)
+    setUploadFilesState([])
+    setUploadPreview(null)
+    setPdfFile(null)
+    setPdfPreview(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -350,7 +438,7 @@ export default function Facturas() {
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          Cargar Facturas XML
+          Cargar Facturas
         </button>
       </div>
 
@@ -582,10 +670,10 @@ export default function Facturas() {
             }}>
               <div>
                 <h5 style={{ margin: 0, fontWeight: 700, color: '#5a5c69', fontSize: '1.1rem' }}>
-                  Cargar Facturas DIAN
+                  Cargar Facturas (XML o PDF)
                 </h5>
                 <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#858796' }}>
-                  Archivos XML individuales o ZIP con múltiples facturas
+                  XML/ZIP para DIAN y PDF para extracción asistida
                 </p>
               </div>
               <button onClick={handleCloseModal} style={{
@@ -599,6 +687,40 @@ export default function Facturas() {
 
             {/* BODY — scrollable */}
             <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+
+              {/* SELECTOR DE MODO */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => handleModeChange('xml')}
+                  style={{
+                    flex: 1,
+                    borderRadius: '8px',
+                    border: uploadMode === 'xml' ? '2px solid #4e73df' : '1px solid #d1d3e2',
+                    background: uploadMode === 'xml' ? '#eef2ff' : '#fff',
+                    color: '#4e73df',
+                    fontWeight: 700,
+                    padding: '10px 12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  XML / ZIP DIAN
+                </button>
+                <button
+                  onClick={() => handleModeChange('pdf')}
+                  style={{
+                    flex: 1,
+                    borderRadius: '8px',
+                    border: uploadMode === 'pdf' ? '2px solid #1cc88a' : '1px solid #d1d3e2',
+                    background: uploadMode === 'pdf' ? '#e9fff4' : '#fff',
+                    color: '#1cc88a',
+                    fontWeight: 700,
+                    padding: '10px 12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  PDF (OCR + IA)
+                </button>
+              </div>
 
               {/* ZONA DRAG & DROP */}
               <div
@@ -628,20 +750,22 @@ export default function Facturas() {
                   Arrastra archivos aquí o haz clic para seleccionar
                 </p>
                 <p style={{ fontSize: '0.8rem', color: '#858796', margin: 0 }}>
-                  Formatos aceptados: .xml, .zip — Múltiples archivos permitidos
+                  {uploadMode === 'pdf'
+                    ? 'Formato aceptado: .pdf — Un archivo por carga'
+                    : 'Formatos aceptados: .xml, .zip — Múltiples archivos permitidos'}
                 </p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xml,.zip"
-                  multiple
+                  accept={uploadMode === 'pdf' ? '.pdf' : '.xml,.zip'}
+                  multiple={uploadMode !== 'pdf'}
                   style={{ display: 'none' }}
                   onChange={(e) => handleFilesSelected(e.target.files)}
                 />
               </div>
 
               {/* LISTA DE ARCHIVOS SELECCIONADOS */}
-              {uploadFilesState.length > 0 && (
+              {uploadMode !== 'pdf' && uploadFilesState.length > 0 && (
                 <div style={{
                   background: '#f8f9fc',
                   borderRadius: '8px',
@@ -670,6 +794,34 @@ export default function Facturas() {
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {uploadMode === 'pdf' && pdfFile && (
+                <div style={{
+                  background: '#f8f9fc',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: '20px'
+                }}>
+                  <p style={{
+                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase',
+                    letterSpacing: '0.05em', color: '#858796', margin: '0 0 8px'
+                  }}>
+                    Archivo PDF seleccionado
+                  </p>
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    alignItems: 'center', padding: '6px 0'
+                  }}>
+                    <span style={{ fontSize: '0.8rem', color: '#5a5c69', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <IconFileText size={14} color="#858796" />
+                      {pdfFile.name}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#858796' }}>
+                      {(pdfFile.size / 1024).toFixed(1)} KB
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -710,7 +862,7 @@ export default function Facturas() {
               </div>
 
               {/* RESULTADO DE PREVISUALIZACIÓN */}
-              {uploadPreview && (
+              {uploadMode !== 'pdf' && uploadPreview && (
                 <div style={{ marginTop: '20px' }}>
                   <div
                     className="text-sm fw-bold text-muted"
@@ -803,6 +955,96 @@ export default function Facturas() {
                 </div>
               )}
 
+              {uploadMode === 'pdf' && pdfPreview && (
+                <div style={{ marginTop: '20px' }}>
+                  <div className="text-sm fw-bold text-muted" style={{ marginBottom: '0.5rem' }}>
+                    PDF extraído — Confianza: {Math.round((pdfPreview.extraction?.confianza || 0) * 100)}% ·
+                    Páginas: {pdfPreview.extraction?.pages || 0}
+                  </div>
+                  {(pdfPreview.extraction?.warnings || []).length > 0 && (
+                    <div className="ui-alert" role="alert" style={{ marginBottom: '12px' }}>
+                      {pdfPreview.extraction.warnings.join(' · ')}
+                    </div>
+                  )}
+                  {pdfPreview.preview ? (
+                    <div className="table-responsive" style={{ borderRadius: '0.375rem', border: '1px solid var(--border)' }}>
+                      <table className="table-admin">
+                        <thead>
+                          <tr>
+                            <th>Factura</th>
+                            <th>Proveedor</th>
+                            <th>Estado</th>
+                            <th>Resumen IA</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(pdfPreview.preview.facturas || []).map((entry, idx) => {
+                            const previewItems = entry.factura_preview?.items || []
+                            const itemsWithSuggestion = previewItems.filter((item) => (
+                              item?.cuenta_contable_alegra
+                              || item?.centro_costo_alegra
+                              || item?.suggested_cuenta_contable_alegra
+                              || item?.suggested_centro_costo_alegra
+                            ))
+                            const sampleItems = previewItems.slice(0, 3).map(buildPreviewSuggestionText)
+
+                            return (
+                              <tr key={`pdf-preview-${idx}`}>
+                                <td className="text-sm fw-bold">{entry.factura_preview?.numero_factura || '—'}</td>
+                                <td className="text-sm">{entry.factura_preview?.nombre_proveedor || '—'}</td>
+                                <td><StatusBadge status={entry.status || 'pendiente'} /></td>
+                                <td className="text-sm" style={{ minWidth: '320px' }}>
+                                  {entry.reason ? (
+                                    <span className="text-muted">{entry.reason}</span>
+                                  ) : (
+                                    <div style={{ display: 'grid', gap: '0.35rem' }}>
+                                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                        <span className="text-xs fw-bold text-muted">
+                                          Ítems: {previewItems.length}
+                                        </span>
+                                        <span className="text-xs fw-bold" style={{ color: '#1f7a3d' }}>
+                                          Con sugerencia: {itemsWithSuggestion.length}
+                                        </span>
+                                      </div>
+
+                                      {sampleItems.length > 0 ? sampleItems.map((item, i) => (
+                                        <div
+                                          key={`pdf-suggestion-${i}`}
+                                          style={{
+                                            background: '#f8f9fc',
+                                            border: '1px solid #e3e6f0',
+                                            borderRadius: '6px',
+                                            padding: '0.35rem 0.5rem',
+                                          }}
+                                        >
+                                          <div className="text-xs fw-bold" style={{ color: '#5a5c69', marginBottom: '2px' }}>
+                                            {item.descripcion}
+                                          </div>
+                                          <div className="text-xs text-muted">
+                                            Cuenta: <strong>{item.cuenta}</strong> · Centro: <strong>{item.centro}</strong>
+                                          </div>
+                                          <div className="text-xs text-muted">
+                                            Fuente: {item.source} · Confianza: {item.confidenceText}
+                                          </div>
+                                        </div>
+                                      )) : (
+                                        <span className="text-muted text-xs">Sin información de sugerencias</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted">Sin previsualización disponible.</div>
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* FOOTER */}
@@ -825,33 +1067,67 @@ export default function Facturas() {
               >
                 Cancelar
               </button>
-              <button
-                onClick={handlePreviewUpload}
-                disabled={uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving}
-                style={{
-                  background: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#f8f9fc' : 'white',
-                  color: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#b7b9cc' : '#4e73df',
-                  border: `1px solid ${(uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#e3e6f0' : '#4e73df'}`,
-                  borderRadius: '6px', padding: '8px 20px',
-                  fontWeight: 600, fontSize: '0.875rem',
-                  cursor: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {uploadPreviewLoading ? 'Procesando…' : 'Previsualizar'}
-              </button>
-              <button
-                onClick={handleUploadFacturas}
-                disabled={uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading}
-                style={{
-                  background: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? '#b7b9cc' : '#4e73df',
-                  color: 'white', border: 'none', borderRadius: '6px',
-                  padding: '8px 20px', fontWeight: 700,
-                  fontSize: '0.875rem',
-                  cursor: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {uploadSaving ? 'Cargando…' : 'Cargar Facturas'}
-              </button>
+              {uploadMode !== 'pdf' ? (
+                <>
+                  <button
+                    onClick={handlePreviewUpload}
+                    disabled={uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving}
+                    style={{
+                      background: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#f8f9fc' : 'white',
+                      color: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#b7b9cc' : '#4e73df',
+                      border: `1px solid ${(uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#e3e6f0' : '#4e73df'}`,
+                      borderRadius: '6px', padding: '8px 20px',
+                      fontWeight: 600, fontSize: '0.875rem',
+                      cursor: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {uploadPreviewLoading ? 'Procesando…' : 'Previsualizar'}
+                  </button>
+                  <button
+                    onClick={handleUploadFacturas}
+                    disabled={uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading}
+                    style={{
+                      background: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? '#b7b9cc' : '#4e73df',
+                      color: 'white', border: 'none', borderRadius: '6px',
+                      padding: '8px 20px', fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {uploadSaving ? 'Cargando…' : 'Cargar Facturas'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handlePreviewPdf}
+                    disabled={!pdfFile || pdfPreviewLoading || pdfConfirming}
+                    style={{
+                      background: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#f8f9fc' : 'white',
+                      color: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#b7b9cc' : '#1cc88a',
+                      border: `1px solid ${(!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#e3e6f0' : '#1cc88a'}`,
+                      borderRadius: '6px', padding: '8px 20px',
+                      fontWeight: 600, fontSize: '0.875rem',
+                      cursor: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {pdfPreviewLoading ? 'Procesando…' : 'Previsualizar PDF'}
+                  </button>
+                  <button
+                    onClick={handleConfirmPdf}
+                    disabled={!pdfPreview || pdfConfirming || pdfPreviewLoading}
+                    style={{
+                      background: (!pdfPreview || pdfConfirming || pdfPreviewLoading) ? '#b7b9cc' : '#1cc88a',
+                      color: 'white', border: 'none', borderRadius: '6px',
+                      padding: '8px 20px', fontWeight: 700,
+                      fontSize: '0.875rem',
+                      cursor: (!pdfPreview || pdfConfirming || pdfPreviewLoading) ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {pdfConfirming ? 'Cargando…' : 'Confirmar PDF'}
+                  </button>
+                </>
+              )}
             </div>
 
           </div>

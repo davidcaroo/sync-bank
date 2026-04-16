@@ -722,6 +722,17 @@ class AlegraClient:
                 return res.json()
 
             error_text = res.text
+            error_payload = None
+            try:
+                error_payload = res.json()
+            except Exception:
+                error_payload = None
+
             if _is_duplicate_bill_error(error_text):
                 raise AlegraDuplicateBillError("La factura ya fue causada en Alegra (documento duplicado).")
-            raise RemoteAPIError(f"Error Alegra API al crear Bill: {error_text}")
+
+            raise RemoteAPIError(
+                f"Error Alegra API al crear Bill: {error_text}",
+                status_code=res.status_code,
+                payload=error_payload,
+            )

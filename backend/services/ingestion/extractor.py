@@ -79,6 +79,19 @@ class IngestionExtractor:
                 "errors": errs,
             }
 
+            if lower_name.endswith(".pdf"):
+                return {
+                    "documents": [],
+                    "errors": [
+                        {
+                            "file_name": name,
+                            "entry_name": name,
+                            "status": "invalid",
+                            "reason": "PDF no soportado en este endpoint. Usa /extraer-pdf en ai-service.",
+                        }
+                    ],
+                }
+
         return {
             "documents": [],
             "errors": [

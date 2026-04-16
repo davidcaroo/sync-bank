@@ -16,6 +16,11 @@ export const previewFacturasUpload = (formData, applyAi = true) => api.post(`/fa
 export const uploadFacturas = (formData, applyAi = true) => api.post(`/facturas/upload?apply_ai=${applyAi}`, formData, {
   headers: { 'Content-Type': 'multipart/form-data' },
 })
+export const extraerPdf = (formData, preview = true) => api.post(`/facturas/extraer-pdf?preview=${preview}`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+})
+export const previewPdfFacturas = (payload) => api.post('/facturas/preview-pdf', payload)
+export const confirmarPdfFacturas = (payload) => api.post('/facturas/confirmar-pdf', payload)
 
 export const getConfigCuentas = (params) => api.get('/config', { params })
 export const getAlegraCatalogo = (params) => api.get('/config/alegra/catalogo', { params })
