@@ -2,10 +2,12 @@ import logging
 import json
 import base64
 import hmac
+import hashlib
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -31,10 +33,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sync-bank API", lifespan=lifespan)
 
+SESSION_COOKIE = "syncbank_session"
+SESSION_SECONDS = 8 * 60 * 60
+
+
+def _create_session() -> str:
+    payload = f"{settings.ADMIN_USERNAME}:{int(time.time()) + SESSION_SECONDS}"
+    signature = hmac.new(
+        settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
+    return base64.urlsafe_b64encode(f"{payload}:{signature}".encode()).decode()
+
+
+def _valid_session(token: str | None) -> bool:
+    if not token or not settings.ADMIN_API_KEY:
+        return False
+    try:
+        username, expires, signature = (
+            base64.urlsafe_b64decode(token).decode().split(":")
+        )
+        payload = f"{username}:{expires}"
+        expected = hmac.new(
+            settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
+        ).hexdigest()
+        return (
+            hmac.compare_digest(username, settings.ADMIN_USERNAME)
+            and int(expires) > time.time()
+            and hmac.compare_digest(signature, expected)
+        )
+    except (ValueError, UnicodeDecodeError):
+        return False
+
 
 @app.middleware("http")
 async def require_admin(request: Request, call_next):
-    if request.url.path == "/healthz" or not settings.ADMIN_API_KEY:
+    if request.url.path in {"/healthz", "/login"} or not settings.ADMIN_API_KEY:
         return await call_next(request)
     authorization = request.headers.get("Authorization", "")
     try:
@@ -42,18 +75,61 @@ async def require_admin(request: Request, call_next):
         username, password = base64.b64decode(encoded).decode().split(":", 1)
     except (ValueError, UnicodeDecodeError):
         scheme, username, password = "", "", ""
-    valid = (
+    valid_basic = (
         scheme.lower() == "basic"
         and hmac.compare_digest(username, settings.ADMIN_USERNAME)
         and hmac.compare_digest(password, settings.ADMIN_API_KEY)
     )
-    if not valid:
+    valid_cookie = _valid_session(request.cookies.get(SESSION_COOKIE))
+    if not (valid_basic or valid_cookie):
+        if not request.url.path.startswith(("/api/", "/metrics")):
+            return RedirectResponse("/login")
         return JSONResponse(
             status_code=401,
             content={"message": "Autenticacion requerida"},
-            headers={"WWW-Authenticate": 'Basic realm="Sync-bank"'},
         )
     return await call_next(request)
+
+
+LOGIN_PAGE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Sync-bank</title>
+<style>body{margin:0;background:#07111f;color:#e8eef7;font:16px system-ui;display:grid;place-items:center;min-height:100vh}form{width:min(360px,calc(100% - 48px));background:#101d2d;padding:32px;border:1px solid #26394f;border-radius:14px;box-shadow:0 24px 70px #0008}h1{margin:0 0 8px}p{color:#9fb0c5;margin:0 0 24px}label{display:block;margin:16px 0 6px}input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:8px;font:inherit}input{border:1px solid #38506b;background:#07111f;color:white}button{margin-top:22px;border:0;background:#2f6fed;color:white;font-weight:700;cursor:pointer}.error{color:#ff9b9b;margin-top:14px}</style></head><body><form method="post"><h1>Sync-bank</h1><p>Acceso administrativo</p><label>Usuario</label><input name="username" autocomplete="username" required><label>Contraseña</label><input name="password" type="password" autocomplete="current-password" required><button>Ingresar</button>{error}</form></body></html>"""
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return LOGIN_PAGE.replace("{error}", "")
+
+
+@app.post("/login")
+def login(username: str = Form(...), password: str = Form(...)):
+    if not (
+        hmac.compare_digest(username, settings.ADMIN_USERNAME)
+        and hmac.compare_digest(password, settings.ADMIN_API_KEY or "")
+    ):
+        return HTMLResponse(
+            LOGIN_PAGE.replace(
+                "{error}", '<div class="error">Credenciales incorrectas</div>'
+            ),
+            status_code=401,
+        )
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE,
+        _create_session(),
+        max_age=SESSION_SECONDS,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+    )
+    return response
+
+
+@app.post("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 class JsonLogFormatter(logging.Formatter):
