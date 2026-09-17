@@ -82,5 +82,13 @@ Si no tienes `make` instalado en Windows, usa:
 ./scripts/autoskills.ps1
 ```
 
+### PostgreSQL local
+
+`docker compose -f docker-compose.test.yml up -d postgres-test` inicia un PostgreSQL desechable en el puerto 55432.
+
+Aplica el esquema con `psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql`.
+
+Nunca guardes en Git `SOURCE_DATABASE_URL`, volcados con datos de producción ni contraseñas de base de datos.
+
 ---
 Hecho con ❤️ por el equipo de Automatización.

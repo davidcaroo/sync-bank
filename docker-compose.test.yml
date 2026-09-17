@@ -1,0 +1,14 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: syncbank
+      POSTGRES_USER: syncbank
+      POSTGRES_PASSWORD: syncbank
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncbank -d syncbank"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
