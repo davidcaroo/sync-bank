@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
+from repositories import factura_repository
+
 from repositories.factura_repository import (
     get_factura_with_items,
     get_facturas_paginated,
@@ -11,7 +13,6 @@ from repositories.factura_repository import (
     update_item_fields,
 )
 from services.factura_contracts import CausacionRepositoryPort, FacturaRepositoryPort
-from services.supabase_service import save_causacion
 
 
 class SyncFacturaRepositoryAdapter(FacturaRepositoryPort):
@@ -61,4 +62,4 @@ class SyncCausacionRepositoryAdapter(CausacionRepositoryPort):
         self._run_in_executor = run_in_executor
 
     async def save_causacion(self, payload: dict[str, Any]) -> None:
-        await self._run_in_executor(lambda: save_causacion(payload))
+        await self._run_in_executor(lambda: factura_repository.save_causacion(payload))

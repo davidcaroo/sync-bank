@@ -14,11 +14,6 @@ class Settings(BaseSettings):
     ALEGRA_TOKEN: str
     ALEGRA_CUENTA_DEFAULT_GASTOS: str = "5001"
     
-    SUPABASE_URL: str
-    SUPABASE_KEY: str | None = None
-    SUPABASE_SERVICE_KEY: str | None = None
-    SUPABASE_REQUIRE_SERVICE_KEY: bool = True
-
     DATABASE_URL: str
     DB_POOL_MIN_SIZE: int = 1
     DB_POOL_MAX_SIZE: int = 5

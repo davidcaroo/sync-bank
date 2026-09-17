@@ -4,8 +4,6 @@ os.environ.setdefault("IMAP_USER", "test")
 os.environ.setdefault("IMAP_PASS", "test")
 os.environ.setdefault("ALEGRA_EMAIL", "test@example.com")
 os.environ.setdefault("ALEGRA_TOKEN", "token")
-os.environ.setdefault("SUPABASE_URL", "http://localhost")
-os.environ.setdefault("SUPABASE_SERVICE_KEY", "service")
 
 from services.pdf_ingestion_service import PdfIngestionService
 

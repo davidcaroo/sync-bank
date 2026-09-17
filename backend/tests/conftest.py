@@ -7,10 +7,6 @@ REQUIRED_ENV = {
     "IMAP_PASS": "test",
     "ALEGRA_EMAIL": "test",
     "ALEGRA_TOKEN": "test",
-    "SUPABASE_URL": "http://localhost",
-    "SUPABASE_KEY": "test",
-    "SUPABASE_SERVICE_KEY": "test",
-    "SUPABASE_REQUIRE_SERVICE_KEY": "true",
     "ADMIN_API_KEY": "test",
     "DATABASE_URL": "postgresql://syncbank:syncbank@localhost:55432/syncbank",
 }
