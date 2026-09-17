@@ -404,38 +404,9 @@ export default function Facturas() {
             Consulta completa y causación manual — {count} registro{count !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          style={{
-            background: '#d4edda',
-            color: '#155724',
-            border: '1.5px solid #c3e6cb',
-            borderRadius: '8px',
-            padding: '10px 20px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = '#c3e6cb'
-            e.currentTarget.style.borderColor = '#b1dfbb'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = '#d4edda'
-            e.currentTarget.style.borderColor = '#c3e6cb'
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" 
-               stroke="currentColor" strokeWidth="2.5">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          Cargar Facturas
+        <button className="btn-primary" onClick={() => setShowUploadModal(true)}>
+          <IconUpload size={16} />
+          Cargar facturas
         </button>
       </div>
 
@@ -632,86 +603,43 @@ export default function Facturas() {
 
       {/* ── Modal Carga Manual DIAN ──────────────────────────────── */}
       {showUploadModal && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.5)',
-          zIndex: 1050,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
-        }}
-        onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
+        <div
+          className="modal-backdrop"
+          onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cargar facturas"
         >
-          <div style={{
-            background: 'white',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '600px',
-            maxHeight: '90vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
-          }}>
-
+          <div className="modal-box">
             {/* HEADER */}
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: '1px solid #e3e6f0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
+            <div className="modal-header">
               <div>
-                <h5 style={{ margin: 0, fontWeight: 700, color: '#5a5c69', fontSize: '1.1rem' }}>
-                  Cargar Facturas (XML o PDF)
-                </h5>
-                <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#858796' }}>
+                <h3 className="modal-header-title">Cargar facturas (XML o PDF)</h3>
+                <p className="text-sm text-muted" style={{ marginTop: '0.1rem' }}>
                   XML/ZIP para DIAN y PDF para extracción asistida
                 </p>
               </div>
-              <button onClick={handleCloseModal} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '4px', borderRadius: '4px'
-              }}>
-                <IconX size={20} color="#858796" />
+              <button onClick={handleCloseModal} className="icon-btn" aria-label="Cerrar modal">
+                <IconX size={16} />
               </button>
             </div>
 
             {/* BODY — scrollable */}
-            <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+            <div className="modal-body">
 
               {/* SELECTOR DE MODO */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
                 <button
                   onClick={() => handleModeChange('xml')}
-                  style={{
-                    flex: 1,
-                    borderRadius: '8px',
-                    border: uploadMode === 'xml' ? '2px solid #4e73df' : '1px solid #d1d3e2',
-                    background: uploadMode === 'xml' ? '#eef2ff' : '#fff',
-                    color: '#4e73df',
-                    fontWeight: 700,
-                    padding: '10px 12px',
-                    cursor: 'pointer'
-                  }}
+                  className={uploadMode === 'xml' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   XML / ZIP DIAN
                 </button>
                 <button
                   onClick={() => handleModeChange('pdf')}
-                  style={{
-                    flex: 1,
-                    borderRadius: '8px',
-                    border: uploadMode === 'pdf' ? '2px solid #1cc88a' : '1px solid #d1d3e2',
-                    background: uploadMode === 'pdf' ? '#e9fff4' : '#fff',
-                    color: '#1cc88a',
-                    fontWeight: 700,
-                    padding: '10px 12px',
-                    cursor: 'pointer'
-                  }}
+                  className={uploadMode === 'pdf' ? 'btn-primary' : 'btn-secondary'}
+                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   PDF (texto + OCR)
                 </button>
@@ -726,25 +654,25 @@ export default function Facturas() {
                   setDragOver(false)
                   handleFilesSelected(e.dataTransfer.files)
                 }}
-                style={{
-                  border: `2px dashed ${dragOver ? '#4e73df' : '#d1d3e2'}`,
-                  borderRadius: '10px',
-                  padding: '40px 24px',
-                  textAlign: 'center',
-                  background: dragOver ? '#f0f4ff' : '#fafbfc',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer',
-                  marginBottom: '20px'
-                }}
                 onClick={() => fileInputRef.current?.click()}
+                style={{
+                  border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: '12px',
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center',
+                  background: dragOver ? 'var(--accent-soft)' : 'var(--panel-soft)',
+                  transition: 'background 160ms ease, border-color 160ms ease',
+                  cursor: 'pointer',
+                  marginBottom: '1.25rem',
+                }}
               >
-                <div style={{ marginBottom: '16px', opacity: 0.3 }}>
-                  <IconFolder size={48} color="currentColor" />
+                <div style={{ marginBottom: '0.75rem', color: 'var(--muted)' }}>
+                  <IconFolder size={40} />
                 </div>
-                <p style={{ fontWeight: 700, color: '#5a5c69', margin: '0 0 4px' }}>
+                <p className="fw-bold" style={{ margin: '0 0 0.25rem', color: 'var(--heading)' }}>
                   Arrastra archivos aquí o haz clic para seleccionar
                 </p>
-                <p style={{ fontSize: '0.8rem', color: '#858796', margin: 0 }}>
+                <p className="text-sm text-muted" style={{ margin: 0 }}>
                   {uploadMode === 'pdf'
                     ? 'Formato aceptado: .pdf — Un archivo por carga'
                     : 'Formatos aceptados: .xml, .zip — Múltiples archivos permitidos'}
@@ -761,61 +689,40 @@ export default function Facturas() {
 
               {/* LISTA DE ARCHIVOS SELECCIONADOS */}
               {uploadMode !== 'pdf' && uploadFilesState.length > 0 && (
-                <div style={{
-                  background: '#f8f9fc',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  marginBottom: '20px'
-                }}>
-                  <p style={{
-                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase',
-                    letterSpacing: '0.05em', color: '#858796', margin: '0 0 8px'
-                  }}>
+                <div className="meta-item" style={{ padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                  <p className="text-xs fw-xbold text-upper text-muted" style={{ marginBottom: '0.5rem' }}>
                     {uploadFilesState.length} archivo(s) seleccionado(s)
                   </p>
                   {uploadFilesState.map((file, i) => (
-                    <div key={i} style={{
-                      display: 'flex', justifyContent: 'space-between',
-                      alignItems: 'center', padding: '6px 0',
-                      borderBottom: i < uploadFilesState.length - 1 
-                        ? '1px solid #e3e6f0' : 'none'
-                    }}>
-                      <span style={{ fontSize: '0.8rem', color: '#5a5c69', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <IconFileText size={14} color="#858796" />
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '0.35rem 0',
+                        borderBottom: i < uploadFilesState.length - 1 ? '1px solid var(--border)' : 'none',
+                      }}
+                    >
+                      <span className="text-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <IconFileText size={14} className="text-muted" />
                         {file.name}
                       </span>
-                      <span style={{ fontSize: '0.75rem', color: '#858796' }}>
-                        {(file.size / 1024).toFixed(1)} KB
-                      </span>
+                      <span className="text-xs text-muted">{(file.size / 1024).toFixed(1)} KB</span>
                     </div>
                   ))}
                 </div>
               )}
 
               {uploadMode === 'pdf' && pdfFile && (
-                <div style={{
-                  background: '#f8f9fc',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  marginBottom: '20px'
-                }}>
-                  <p style={{
-                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase',
-                    letterSpacing: '0.05em', color: '#858796', margin: '0 0 8px'
-                  }}>
+                <div className="meta-item" style={{ padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                  <p className="text-xs fw-xbold text-upper text-muted" style={{ marginBottom: '0.5rem' }}>
                     Archivo PDF seleccionado
                   </p>
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center', padding: '6px 0'
-                  }}>
-                    <span style={{ fontSize: '0.8rem', color: '#5a5c69', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <IconFileText size={14} color="#858796" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="text-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <IconFileText size={14} className="text-muted" />
                       {pdfFile.name}
                     </span>
-                    <span style={{ fontSize: '0.75rem', color: '#858796' }}>
-                      {(pdfFile.size / 1024).toFixed(1)} KB
-                    </span>
+                    <span className="text-xs text-muted">{(pdfFile.size / 1024).toFixed(1)} KB</span>
                   </div>
                 </div>
               )}
@@ -868,7 +775,7 @@ export default function Facturas() {
                                       <span className="text-xs fw-bold text-muted">
                                         Ítems: {previewItems.length}
                                       </span>
-                                      <span className="text-xs fw-bold" style={{ color: '#1f7a3d' }}>
+                                      <span className="text-xs fw-bold" style={{ color: 'var(--success)' }}>
                                         Con sugerencia: {itemsWithSuggestion.length}
                                       </span>
                                     </div>
@@ -876,14 +783,12 @@ export default function Facturas() {
                                     {sampleItems.length > 0 ? sampleItems.map((item, i) => (
                                       <div
                                         key={`${entry.file_name || 'f'}-suggestion-${i}`}
+                                        className="meta-item"
                                         style={{
-                                          background: '#f8f9fc',
-                                          border: '1px solid #e3e6f0',
-                                          borderRadius: '6px',
                                           padding: '0.35rem 0.5rem',
                                         }}
                                       >
-                                        <div className="text-xs fw-bold" style={{ color: '#5a5c69', marginBottom: '2px' }}>
+                                        <div className="text-xs fw-bold" style={{ color: 'var(--heading)', marginBottom: '2px' }}>
                                           {item.descripcion}
                                         </div>
                                         <div className="text-xs text-muted">
@@ -960,7 +865,7 @@ export default function Facturas() {
                                         <span className="text-xs fw-bold text-muted">
                                           Ítems: {previewItems.length}
                                         </span>
-                                        <span className="text-xs fw-bold" style={{ color: '#1f7a3d' }}>
+                                        <span className="text-xs fw-bold" style={{ color: 'var(--success)' }}>
                                           Con sugerencia: {itemsWithSuggestion.length}
                                         </span>
                                       </div>
@@ -968,14 +873,12 @@ export default function Facturas() {
                                       {sampleItems.length > 0 ? sampleItems.map((item, i) => (
                                         <div
                                           key={`pdf-suggestion-${i}`}
+                                          className="meta-item"
                                           style={{
-                                            background: '#f8f9fc',
-                                            border: '1px solid #e3e6f0',
-                                            borderRadius: '6px',
                                             padding: '0.35rem 0.5rem',
                                           }}
                                         >
-                                          <div className="text-xs fw-bold" style={{ color: '#5a5c69', marginBottom: '2px' }}>
+                                          <div className="text-xs fw-bold" style={{ color: 'var(--heading)', marginBottom: '2px' }}>
                                             {item.descripcion}
                                           </div>
                                           <div className="text-xs text-muted">
@@ -1006,23 +909,8 @@ export default function Facturas() {
             </div>
 
             {/* FOOTER */}
-            <div style={{
-              padding: '16px 24px',
-              borderTop: '1px solid #e3e6f0',
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px',
-              background: '#fafbfc'
-            }}>
-              <button
-                onClick={handleCloseModal}
-                style={{
-                  background: 'white', color: '#858796',
-                  border: '1px solid #d1d3e2', borderRadius: '6px',
-                  padding: '8px 20px', fontWeight: 600,
-                  fontSize: '0.875rem', cursor: 'pointer'
-                }}
-              >
+            <div className="modal-footer">
+              <button onClick={handleCloseModal} className="btn-secondary">
                 Cancelar
               </button>
               {uploadMode !== 'pdf' ? (
@@ -1030,29 +918,16 @@ export default function Facturas() {
                   <button
                     onClick={handlePreviewUpload}
                     disabled={uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving}
-                    style={{
-                      background: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#f8f9fc' : 'white',
-                      color: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#b7b9cc' : '#4e73df',
-                      border: `1px solid ${(uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? '#e3e6f0' : '#4e73df'}`,
-                      borderRadius: '6px', padding: '8px 20px',
-                      fontWeight: 600, fontSize: '0.875rem',
-                      cursor: (uploadFilesState.length === 0 || uploadPreviewLoading || uploadSaving) ? 'not-allowed' : 'pointer'
-                    }}
+                    className="btn-secondary"
                   >
                     {uploadPreviewLoading ? 'Procesando…' : 'Previsualizar'}
                   </button>
                   <button
                     onClick={handleUploadFacturas}
                     disabled={uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading}
-                    style={{
-                      background: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? '#b7b9cc' : '#4e73df',
-                      color: 'white', border: 'none', borderRadius: '6px',
-                      padding: '8px 20px', fontWeight: 700,
-                      fontSize: '0.875rem',
-                      cursor: (uploadFilesState.length === 0 || uploadSaving || uploadPreviewLoading) ? 'not-allowed' : 'pointer'
-                    }}
+                    className="btn-primary"
                   >
-                    {uploadSaving ? 'Cargando…' : 'Cargar Facturas'}
+                    {uploadSaving ? 'Cargando…' : 'Cargar facturas'}
                   </button>
                 </>
               ) : (
@@ -1060,27 +935,14 @@ export default function Facturas() {
                   <button
                     onClick={handlePreviewPdf}
                     disabled={!pdfFile || pdfPreviewLoading || pdfConfirming}
-                    style={{
-                      background: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#f8f9fc' : 'white',
-                      color: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#b7b9cc' : '#1cc88a',
-                      border: `1px solid ${(!pdfFile || pdfPreviewLoading || pdfConfirming) ? '#e3e6f0' : '#1cc88a'}`,
-                      borderRadius: '6px', padding: '8px 20px',
-                      fontWeight: 600, fontSize: '0.875rem',
-                      cursor: (!pdfFile || pdfPreviewLoading || pdfConfirming) ? 'not-allowed' : 'pointer'
-                    }}
+                    className="btn-secondary"
                   >
                     {pdfPreviewLoading ? 'Procesando…' : 'Previsualizar PDF'}
                   </button>
                   <button
                     onClick={handleConfirmPdf}
                     disabled={!pdfPreview || pdfConfirming || pdfPreviewLoading}
-                    style={{
-                      background: (!pdfPreview || pdfConfirming || pdfPreviewLoading) ? '#b7b9cc' : '#1cc88a',
-                      color: 'white', border: 'none', borderRadius: '6px',
-                      padding: '8px 20px', fontWeight: 700,
-                      fontSize: '0.875rem',
-                      cursor: (!pdfPreview || pdfConfirming || pdfPreviewLoading) ? 'not-allowed' : 'pointer'
-                    }}
+                    className="btn-primary"
                   >
                     {pdfConfirming ? 'Cargando…' : 'Confirmar PDF'}
                   </button>

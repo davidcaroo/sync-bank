@@ -5,7 +5,7 @@ import {
   IconSettings as Settings,
   IconHistory as History,
   IconUsers as Users,
-  IconPlus as Menu, // Fallback if no Menu icon provided, but I'll check Icons.jsx
+  IconMenu as Menu,
   IconRefresh as Sun,
   IconBell as BellRing,
   IconChevronLeft as PanelLeftClose,

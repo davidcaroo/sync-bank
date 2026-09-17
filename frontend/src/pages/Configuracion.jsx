@@ -179,7 +179,7 @@ export default function Configuracion() {
               onClick={resetForm}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <IconX size={14} color="#858796" /> Cancelar edición
+              <IconX size={14} color="var(--muted)" /> Cancelar edición
             </button>
           )}
         </div>
@@ -432,7 +432,7 @@ export default function Configuracion() {
                         title="Editar"
                         className="btn-secondary btn-sm"
                         onClick={(e) => { e.stopPropagation(); handleEdit(row) }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #f6c23e', color: '#f6c23e' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid var(--warning)', color: 'var(--warning)' }}
                       >
                         <IconEdit size={14} />
                         <span className="d-none-mobile">Editar</span>

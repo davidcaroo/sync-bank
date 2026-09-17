@@ -15,6 +15,7 @@ import {
   IconChevronRight
 } from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { KpiCard } from '../components/DashboardBase'
 import {
   createContacto,
   deleteContacto,
@@ -279,122 +280,10 @@ export default function Contactos() {
       {error && <div className="ui-alert" role="alert">{error}</div>}
 
       {/* ── KPI Cards ─────────────────────────────────────────────── */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
-        gap: '1.5rem', 
-        marginBottom: '1.5rem' 
-      }}>
-        {/* Total Visibles */}
-        <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          borderLeft: '4px solid #4e73df',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: '100px'
-        }}>
-          <div>
-            <div style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: '#858796',
-              marginBottom: '6px'
-            }}>
-              TOTAL VISIBLES
-            </div>
-            <div style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
-              color: '#5a5c69',
-              lineHeight: 1
-            }}>
-              {kpis.total}
-            </div>
-          </div>
-          <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <Users size={38} />
-          </div>
-        </div>
-
-        {/* Contactos Activos */}
-        <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          borderLeft: '4px solid #1cc88a',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: '100px'
-        }}>
-          <div>
-            <div style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: '#858796',
-              marginBottom: '6px'
-            }}>
-              CONTACTOS ACTIVOS
-            </div>
-            <div style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
-              color: '#5a5c69',
-              lineHeight: 1
-            }}>
-              {kpis.activos}
-            </div>
-          </div>
-          <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <UserCheck size={38} />
-          </div>
-        </div>
-
-        {/* Contactos Inactivos */}
-        <div style={{
-          background: 'white',
-          borderRadius: '8px',
-          borderLeft: '4px solid #858796',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: '100px'
-        }}>
-          <div>
-            <div style={{
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: '#858796',
-              marginBottom: '6px'
-            }}>
-              CONTACTOS INACTIVOS
-            </div>
-            <div style={{
-              fontSize: '1.75rem',
-              fontWeight: 700,
-              color: '#5a5c69',
-              lineHeight: 1
-            }}>
-              {kpis.inactivos}
-            </div>
-          </div>
-          <div style={{ opacity: 0.15, fontSize: '2.5rem', color: '#5a5c69' }}>
-            <UserMinus size={38} />
-          </div>
-        </div>
+      <div className="dashboard-kpi-grid kpi-grid-3">
+        <KpiCard label="Total visibles" value={kpis.total} icon={Users} color="blue-500" loading={loading && rows.length === 0} />
+        <KpiCard label="Contactos activos" value={kpis.activos} icon={UserCheck} color="green-500" loading={loading && rows.length === 0} />
+        <KpiCard label="Contactos inactivos" value={kpis.inactivos} icon={UserMinus} color="yellow-500" loading={loading && rows.length === 0} />
       </div>
 
       {/* ── Tabs ── */}
