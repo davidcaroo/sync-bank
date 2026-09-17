@@ -12,12 +12,14 @@ class MappingPersistor:
         share: float,
         source: str,
     ) -> dict | None:
-        return await run_in_executor(lambda: save_config_cuenta(
-            nit_proveedor=nit_proveedor,
-            nombre_proveedor=nombre_proveedor,
-            id_cuenta_alegra=cuenta,
-            id_centro_costo_alegra=None,
-            confianza=round(share, 3),
-            activo=True,
-            source=source,
-        ))
+        return await run_in_executor(
+            lambda: save_config_cuenta(
+                nit_proveedor=nit_proveedor,
+                nombre_proveedor=nombre_proveedor,
+                id_cuenta_alegra=cuenta,
+                id_centro_costo_alegra=None,
+                confianza=round(share, 3),
+                activo=True,
+                source=source,
+            )
+        )

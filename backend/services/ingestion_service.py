@@ -1,7 +1,10 @@
 from services.ingestion.extractor import IngestionExtractor, XMLDocument
 from services.ingestion.prefill import IngestionPrefill
 from services.ingestion.processor import IngestionProcessor
-from repositories.ingestion_adapters import SyncFacturaRepositoryAdapter, SyncProviderConfigRepositoryAdapter
+from repositories.ingestion_adapters import (
+    SyncFacturaRepositoryAdapter,
+    SyncProviderConfigRepositoryAdapter,
+)
 from repositories.config_repository import (
     get_config_cuenta,
     sync_config_proveedor_nombre,
@@ -9,6 +12,7 @@ from repositories.config_repository import (
 from repositories.factura_repository import find_factura_by_cufe, save_factura
 from repositories.db_utils import run_in_executor
 from services.xml_parser import parse_xml_dian
+
 
 class IngestionService:
     def __init__(self) -> None:
@@ -18,7 +22,9 @@ class IngestionService:
     async def extract_xml_documents_from_upload(self, files) -> list[dict]:
         return await self._extractor.extract_xml_documents_from_upload(files)
 
-    def extract_xml_documents_from_attachment(self, file_name: str, content: bytes) -> dict:
+    def extract_xml_documents_from_attachment(
+        self, file_name: str, content: bytes
+    ) -> dict:
         return self._extractor.extract_xml_documents_from_attachment(file_name, content)
 
     async def process_xml_document(
@@ -69,7 +75,9 @@ class IngestionService:
         path: str,
         depth: int,
     ) -> tuple[list[XMLDocument], list[dict]]:
-        return self._extractor._extract_xml_from_zip_bytes(zip_name, content, path=path, depth=depth)
+        return self._extractor._extract_xml_from_zip_bytes(
+            zip_name, content, path=path, depth=depth
+        )
 
     def _decode_xml_bytes(self, content: bytes) -> str | None:
         return self._extractor._decode_xml_bytes(content)

@@ -19,4 +19,3 @@ API_IN_PROGRESS = Gauge(
     "syncbank_api_requests_in_progress",
     "Current number of API requests in progress",
 )
-

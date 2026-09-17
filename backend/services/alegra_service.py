@@ -1,5 +1,4 @@
 from services.alegra_client import AlegraClient
-from services.errors import AlegraDuplicateBillError
 
 
 class AlegraService:
@@ -22,7 +21,14 @@ class AlegraService:
     async def get_cost_centers(self, client):
         return await self._client.get_cost_centers(client)
 
-    async def list_contacts(self, client, contact_type: str | None = "provider", start: int = 0, limit: int = 30, identification: str | None = None):
+    async def list_contacts(
+        self,
+        client,
+        contact_type: str | None = "provider",
+        start: int = 0,
+        limit: int = 30,
+        identification: str | None = None,
+    ):
         return await self._client.list_contacts(
             client,
             contact_type=contact_type,
@@ -49,7 +55,13 @@ class AlegraService:
     async def find_provider_contact_by_nit(self, client, nit: str) -> dict | None:
         return await self._client.find_provider_contact_by_nit(client, nit)
 
-    async def get_bill_accounting_by_invoice(self, *, nit_proveedor: str | None, numero_factura: str | None, max_pages: int = 20) -> dict | None:
+    async def get_bill_accounting_by_invoice(
+        self,
+        *,
+        nit_proveedor: str | None,
+        numero_factura: str | None,
+        max_pages: int = 20
+    ) -> dict | None:
         return await self._client.get_bill_accounting_by_invoice(
             nit_proveedor=nit_proveedor,
             numero_factura=numero_factura,
@@ -64,5 +76,6 @@ class AlegraService:
 
     async def crear_bill(self, factura):
         return await self._client.crear_bill(factura)
+
 
 alegra_service = AlegraService()

@@ -40,7 +40,9 @@ class IngestionExtractor:
             "errors": errors,
         }
 
-    def extract_xml_documents_from_attachment(self, file_name: str, content: bytes) -> dict:
+    def extract_xml_documents_from_attachment(
+        self, file_name: str, content: bytes
+    ) -> dict:
         name = file_name or "sin_nombre"
         lower_name = name.lower()
 
@@ -59,12 +61,16 @@ class IngestionExtractor:
                     ],
                 }
             return {
-                "documents": [XMLDocument(file_name=name, entry_name=name, xml_text=xml_text)],
+                "documents": [
+                    XMLDocument(file_name=name, entry_name=name, xml_text=xml_text)
+                ],
                 "errors": [],
             }
 
         if lower_name.endswith(".zip"):
-            docs, errs = self._extract_xml_from_zip_bytes(name, content, path=name, depth=0)
+            docs, errs = self._extract_xml_from_zip_bytes(
+                name, content, path=name, depth=0
+            )
             if not docs and not errs:
                 errs.append(
                     {
@@ -146,16 +152,22 @@ class IngestionExtractor:
                                 )
                                 continue
                             documents.append(
-                                XMLDocument(file_name=zip_name, entry_name=nested_path, xml_text=xml_text)
+                                XMLDocument(
+                                    file_name=zip_name,
+                                    entry_name=nested_path,
+                                    xml_text=xml_text,
+                                )
                             )
                             continue
 
                         if lower_entry.endswith(".zip"):
-                            nested_docs, nested_errors = self._extract_xml_from_zip_bytes(
-                                zip_name,
-                                entry_bytes,
-                                path=nested_path,
-                                depth=depth + 1,
+                            nested_docs, nested_errors = (
+                                self._extract_xml_from_zip_bytes(
+                                    zip_name,
+                                    entry_bytes,
+                                    path=nested_path,
+                                    depth=depth + 1,
+                                )
                             )
                             documents.extend(nested_docs)
                             errors.extend(nested_errors)
@@ -181,7 +193,14 @@ class IngestionExtractor:
         return documents, errors
 
     def _decode_xml_bytes(self, content: bytes) -> str | None:
-        for encoding in ("utf-8-sig", "utf-8", "utf-16", "utf-16-le", "utf-16-be", "latin-1"):
+        for encoding in (
+            "utf-8-sig",
+            "utf-8",
+            "utf-16",
+            "utf-16-le",
+            "utf-16-be",
+            "latin-1",
+        ):
             try:
                 return content.decode(encoding)
             except Exception:

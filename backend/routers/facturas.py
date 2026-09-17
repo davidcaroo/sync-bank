@@ -55,10 +55,14 @@ class PdfConfirmRequest(BaseModel):
 
 @router.post("/preview-upload")
 async def preview_upload_facturas(
-    files: list[UploadFile] = File(...), apply_ai: bool = True, auto_apply_ai: bool = False
+    files: list[UploadFile] = File(...),
+    apply_ai: bool = True,
+    auto_apply_ai: bool = False,
 ):
     if not files:
-        raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
+        raise HTTPException(
+            status_code=400, detail="Debes subir al menos un archivo XML o ZIP."
+        )
     return await factura_service.preview_upload_facturas(
         files, apply_ai=apply_ai, auto_apply_ai=auto_apply_ai
     )
@@ -66,13 +70,18 @@ async def preview_upload_facturas(
 
 @router.post("/upload")
 async def upload_facturas(
-    files: list[UploadFile] = File(...), apply_ai: bool = True, auto_apply_ai: bool = False
+    files: list[UploadFile] = File(...),
+    apply_ai: bool = True,
+    auto_apply_ai: bool = False,
 ):
     if not files:
-        raise HTTPException(status_code=400, detail="Debes subir al menos un archivo XML o ZIP.")
+        raise HTTPException(
+            status_code=400, detail="Debes subir al menos un archivo XML o ZIP."
+        )
     return await factura_service.upload_facturas(
         files, apply_ai=apply_ai, auto_apply_ai=auto_apply_ai
     )
+
 
 @router.post("/extraer-pdf")
 async def extraer_pdf(file: UploadFile = File(...), preview: bool = True):
@@ -89,7 +98,9 @@ async def extraer_pdf(file: UploadFile = File(...), preview: bool = True):
 @router.post("/preview-pdf")
 async def preview_pdf(payload: PdfConfirmRequest):
     if not payload.facturas:
-        raise HTTPException(status_code=400, detail="Debes enviar al menos una factura.")
+        raise HTTPException(
+            status_code=400, detail="Debes enviar al menos una factura."
+        )
 
     results = []
     for factura in payload.facturas:
@@ -118,7 +129,9 @@ async def preview_pdf(payload: PdfConfirmRequest):
 @router.post("/confirmar-pdf")
 async def confirmar_pdf(payload: PdfConfirmRequest):
     if not payload.facturas:
-        raise HTTPException(status_code=400, detail="Debes enviar al menos una factura.")
+        raise HTTPException(
+            status_code=400, detail="Debes enviar al menos una factura."
+        )
 
     results = []
     for factura in payload.facturas:
@@ -143,9 +156,11 @@ async def confirmar_pdf(payload: PdfConfirmRequest):
         "facturas": results,
     }
 
+
 @router.get("/stats")
 async def get_facturas_stats():
     return await factura_service.get_facturas_stats()
+
 
 @router.get("/")
 async def get_facturas(
@@ -169,6 +184,7 @@ async def get_facturas(
 @router.get("/{factura_id}")
 async def get_factura(factura_id: str):
     return await factura_service.get_factura(factura_id)
+
 
 @router.post("/{factura_id}/causar")
 async def causar_factura(factura_id: str, payload: CausarFacturaRequest | None = None):

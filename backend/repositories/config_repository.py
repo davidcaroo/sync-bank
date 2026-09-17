@@ -9,8 +9,13 @@ from repositories.database import connection, transaction
 logger = logging.getLogger(__name__)
 CONFIG_COLUMNS = frozenset(
     {
-        "nit_proveedor", "nombre_proveedor", "id_cuenta_alegra",
-        "id_centro_costo_alegra", "confianza", "activo", "source",
+        "nit_proveedor",
+        "nombre_proveedor",
+        "id_cuenta_alegra",
+        "id_centro_costo_alegra",
+        "confianza",
+        "activo",
+        "source",
     }
 )
 
@@ -39,18 +44,24 @@ def sync_config_proveedor_nombre(nit: str | None, nombre_proveedor: str | None) 
 def list_config_cuentas(activo: bool | None = None) -> list[dict[str, Any]]:
     with connection() as conn:
         if activo is None:
-            return conn.execute("select * from config_cuentas order by created_at desc").fetchall()
+            return conn.execute(
+                "select * from config_cuentas order by created_at desc"
+            ).fetchall()
         return conn.execute(
             "select * from config_cuentas where activo = %s order by created_at desc",
             (activo,),
         ).fetchall()
 
 
-def _validated_payload(payload: dict[str, Any], *, require_identity: bool = False) -> dict[str, Any]:
+def _validated_payload(
+    payload: dict[str, Any], *, require_identity: bool = False
+) -> dict[str, Any]:
     unknown = set(payload) - CONFIG_COLUMNS
     if not payload or unknown:
         raise ValueError(f"Campos no permitidos: {sorted(unknown)}")
-    if require_identity and (not payload.get("nit_proveedor") or not payload.get("id_cuenta_alegra")):
+    if require_identity and (
+        not payload.get("nit_proveedor") or not payload.get("id_cuenta_alegra")
+    ):
         raise ValueError("nit_proveedor e id_cuenta_alegra son requeridos")
     return payload
 
@@ -58,15 +69,21 @@ def _validated_payload(payload: dict[str, Any], *, require_identity: bool = Fals
 def create_config_cuenta(payload: dict[str, Any]) -> dict[str, Any] | None:
     payload = _validated_payload(payload, require_identity=True)
     columns = list(payload)
-    statement = sql.SQL("insert into config_cuentas ({}) values ({}) returning *").format(
+    statement = sql.SQL(
+        "insert into config_cuentas ({}) values ({}) returning *"
+    ).format(
         sql.SQL(", ").join(map(sql.Identifier, columns)),
         sql.SQL(", ").join(sql.Placeholder() for _ in columns),
     )
     with transaction() as conn:
-        return conn.execute(statement, tuple(payload[column] for column in columns)).fetchone()
+        return conn.execute(
+            statement, tuple(payload[column] for column in columns)
+        ).fetchone()
 
 
-def update_config_cuenta(config_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+def update_config_cuenta(
+    config_id: str, payload: dict[str, Any]
+) -> dict[str, Any] | None:
     payload = _validated_payload(payload)
     columns = list(payload)
     assignments = sql.SQL(", ").join(
@@ -118,8 +135,13 @@ def save_config_cuenta(
             returning *
             """,
             (
-                nit_proveedor, nombre_proveedor, id_cuenta_alegra,
-                id_centro_costo_alegra, confianza, activo, source,
+                nit_proveedor,
+                nombre_proveedor,
+                id_cuenta_alegra,
+                id_centro_costo_alegra,
+                confianza,
+                activo,
+                source,
             ),
         ).fetchone()
         conn.execute(
@@ -128,6 +150,12 @@ def save_config_cuenta(
               (nit_proveedor, id_cuenta_alegra, id_centro_costo_alegra, confianza, source)
             values (%s, %s, %s, %s, %s)
             """,
-            (nit_proveedor, id_cuenta_alegra, id_centro_costo_alegra, confianza, source),
+            (
+                nit_proveedor,
+                id_cuenta_alegra,
+                id_centro_costo_alegra,
+                confianza,
+                source,
+            ),
         )
     return row

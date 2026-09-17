@@ -8,11 +8,30 @@ from repositories.database import connection, transaction
 
 
 FACTURA_COLUMNS = (
-    "cufe", "numero_factura", "fecha_emision", "fecha_vencimiento",
-    "nit_proveedor", "nombre_proveedor", "nit_receptor", "subtotal", "iva",
-    "rete_fuente", "rete_ica", "rete_iva", "total", "moneda", "xml_raw",
-    "estado", "cargos_adicionales", "anticipos", "redondeo", "total_calculado",
-    "diferencia_centavos", "validacion_total", "parsed_version", "calculo_exacto",
+    "cufe",
+    "numero_factura",
+    "fecha_emision",
+    "fecha_vencimiento",
+    "nit_proveedor",
+    "nombre_proveedor",
+    "nit_receptor",
+    "subtotal",
+    "iva",
+    "rete_fuente",
+    "rete_ica",
+    "rete_iva",
+    "total",
+    "moneda",
+    "xml_raw",
+    "estado",
+    "cargos_adicionales",
+    "anticipos",
+    "redondeo",
+    "total_calculado",
+    "diferencia_centavos",
+    "validacion_total",
+    "parsed_version",
+    "calculo_exacto",
 )
 FACTURA_UPDATE_COLUMNS = frozenset(FACTURA_COLUMNS) - {"cufe"}
 ITEM_UPDATE_COLUMNS = frozenset(
@@ -30,7 +49,9 @@ def find_factura_by_cufe(cufe: str | None) -> dict[str, Any] | None:
     if not cufe:
         return None
     with connection() as conn:
-        return conn.execute("select * from facturas where cufe = %s limit 1", (cufe,)).fetchone()
+        return conn.execute(
+            "select * from facturas where cufe = %s limit 1", (cufe,)
+        ).fetchone()
 
 
 def get_successful_causacion(factura_id: str) -> dict[str, Any] | None:
@@ -53,7 +74,9 @@ def mark_factura_estado(factura_id: str, estado: str) -> None:
         )
 
 
-def save_factura(factura_data: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
+def save_factura(
+    factura_data: dict[str, Any], items: list[dict[str, Any]]
+) -> dict[str, Any]:
     columns = [column for column in FACTURA_COLUMNS if column in factura_data]
     if not columns:
         raise ValueError("La factura no contiene campos permitidos")
@@ -67,7 +90,9 @@ def save_factura(factura_data: dict[str, Any], items: list[dict[str, Any]]) -> d
     )
 
     with transaction() as conn:
-        row = conn.execute(insert, tuple(factura_data[column] for column in columns)).fetchone()
+        row = conn.execute(
+            insert, tuple(factura_data[column] for column in columns)
+        ).fetchone()
         if row is None:
             existing = conn.execute(
                 "select id from facturas where cufe = %s limit 1",
@@ -91,11 +116,16 @@ def save_factura(factura_data: dict[str, Any], items: list[dict[str, Any]]) -> d
                     [
                         (
                             factura_id,
-                            item.get("descripcion", ""), item.get("cantidad", 0),
-                            item.get("precio_unitario", 0), item.get("descuento", 0),
-                            item.get("iva_porcentaje", 19), item.get("total_linea", 0),
-                            item.get("cuenta_contable_alegra"), item.get("centro_costo_alegra"),
-                            item.get("prefill_source"), item.get("confidence"),
+                            item.get("descripcion", ""),
+                            item.get("cantidad", 0),
+                            item.get("precio_unitario", 0),
+                            item.get("descuento", 0),
+                            item.get("iva_porcentaje", 19),
+                            item.get("total_linea", 0),
+                            item.get("cuenta_contable_alegra"),
+                            item.get("centro_costo_alegra"),
+                            item.get("prefill_source"),
+                            item.get("confidence"),
                         )
                         for item in items
                     ],
@@ -109,8 +139,13 @@ def get_facturas_stats() -> list[dict[str, Any]]:
 
 
 def get_facturas_paginated(
-    *, page: int, page_size: int, estado: str | None = None,
-    proveedor: str | None = None, desde: str | None = None, hasta: str | None = None,
+    *,
+    page: int,
+    page_size: int,
+    estado: str | None = None,
+    proveedor: str | None = None,
+    desde: str | None = None,
+    hasta: str | None = None,
 ) -> QueryResult:
     clauses: list[str] = []
     params: list[Any] = []
@@ -178,12 +213,18 @@ def _update_factura_or_item(
         ).fetchone()
 
 
-def update_factura_fields(factura_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
-    return _update_factura_or_item("facturas", factura_id, payload, FACTURA_UPDATE_COLUMNS)
+def update_factura_fields(
+    factura_id: str, payload: dict[str, Any]
+) -> dict[str, Any] | None:
+    return _update_factura_or_item(
+        "facturas", factura_id, payload, FACTURA_UPDATE_COLUMNS
+    )
 
 
 def update_item_fields(item_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
-    return _update_factura_or_item("items_factura", item_id, payload, ITEM_UPDATE_COLUMNS)
+    return _update_factura_or_item(
+        "items_factura", item_id, payload, ITEM_UPDATE_COLUMNS
+    )
 
 
 def list_provider_nits() -> list[str]:
@@ -211,7 +252,14 @@ def list_factura_items_by_nit(nit_proveedor: str) -> list[dict[str, Any]]:
 
 
 def save_causacion(payload: dict[str, Any]) -> None:
-    columns = ("factura_id", "alegra_bill_id", "alegra_response", "estado", "intentos", "error_msg")
+    columns = (
+        "factura_id",
+        "alegra_bill_id",
+        "alegra_response",
+        "estado",
+        "intentos",
+        "error_msg",
+    )
     values = [payload.get(column) for column in columns]
     values[2] = Jsonb(values[2]) if values[2] is not None else None
     with transaction() as conn:

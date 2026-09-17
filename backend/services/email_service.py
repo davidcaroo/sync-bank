@@ -22,7 +22,8 @@ def _decode_mime_filename(filename: str | None) -> str:
     except Exception:
         return filename
 
-async def check_emails(search_criteria: str = 'UNSEEN'):
+
+async def check_emails(search_criteria: str = "UNSEEN"):
     summary = {
         "messages_found": 0,
         "messages_processed": 0,
@@ -44,47 +45,52 @@ async def check_emails(search_criteria: str = 'UNSEEN'):
         found_messages = len(messages[0].split())
         summary["messages_found"] = found_messages
         print(f"IMAP Search: {status}, found {found_messages} messages")
-        if status != 'OK':
+        if status != "OK":
             summary["errors"] += 1
             return summary
 
         for num in messages[0].split():
-            status, data = mail.fetch(num, '(RFC822)')
+            status, data = mail.fetch(num, "(RFC822)")
             print(f"Fetching message {num}... status: {status}")
-            if status != 'OK':
+            if status != "OK":
                 summary["errors"] += 1
                 continue
 
             msg = email.message_from_bytes(data[0][1])
 
             email_log = {
-                "mensaje_id": msg['Message-ID'],
-                "remitente": msg['From'],
-                "asunto": msg['Subject'],
+                "mensaje_id": msg["Message-ID"],
+                "remitente": msg["From"],
+                "asunto": msg["Subject"],
                 "attachments_encontrados": 0,
-                "estado": "ignorado"
+                "estado": "ignorado",
             }
 
             has_relevant_attachment = False
             has_errors = False
 
             for part in msg.walk():
-                if part.get_content_maintype() == 'multipart': continue
-                if part.get('Content-Disposition') is None: continue
+                if part.get_content_maintype() == "multipart":
+                    continue
+                if part.get("Content-Disposition") is None:
+                    continue
 
                 filename = _decode_mime_filename(part.get_filename()) or "sin_nombre"
-                if not filename: continue
+                if not filename:
+                    continue
 
                 content = part.get_payload(decode=True)
                 lower_name = filename.lower()
                 if not content:
                     continue
 
-                if not (lower_name.endswith('.xml') or lower_name.endswith('.zip')):
+                if not (lower_name.endswith(".xml") or lower_name.endswith(".zip")):
                     continue
 
                 has_relevant_attachment = True
-                extracted = ingestion_service.extract_xml_documents_from_attachment(filename, content)
+                extracted = ingestion_service.extract_xml_documents_from_attachment(
+                    filename, content
+                )
                 documents = extracted.get("documents") or []
                 extract_errors = extracted.get("errors") or []
 
@@ -95,12 +101,14 @@ async def check_emails(search_criteria: str = 'UNSEEN'):
                     has_errors = True
                     summary["invalid"] += len(extract_errors)
                     for err in extract_errors:
-                        print(f"Error extrayendo XML ({err.get('entry_name')}): {err.get('reason')}")
+                        print(
+                            f"Error extrayendo XML ({err.get('entry_name')}): {err.get('reason')}"
+                        )
                         summary["invalid_details"].append(
                             {
                                 "source": "extract",
-                                "asunto": msg.get('Subject'),
-                                "remitente": msg.get('From'),
+                                "asunto": msg.get("Subject"),
+                                "remitente": msg.get("From"),
                                 "file_name": err.get("file_name") or filename,
                                 "entry_name": err.get("entry_name"),
                                 "reason": err.get("reason") or "Error extrayendo XML.",
@@ -127,11 +135,13 @@ async def check_emails(search_criteria: str = 'UNSEEN'):
                             summary["invalid_details"].append(
                                 {
                                     "source": "parser",
-                                    "asunto": msg.get('Subject'),
-                                    "remitente": msg.get('From'),
+                                    "asunto": msg.get("Subject"),
+                                    "remitente": msg.get("From"),
                                     "file_name": result.get("file_name") or filename,
-                                    "entry_name": result.get("entry_name") or xml_doc.entry_name,
-                                    "reason": result.get("reason") or "Documento XML inválido.",
+                                    "entry_name": result.get("entry_name")
+                                    or xml_doc.entry_name,
+                                    "reason": result.get("reason")
+                                    or "Documento XML inválido.",
                                 }
                             )
                         elif status_result == "error":
@@ -161,7 +171,7 @@ async def check_emails(search_criteria: str = 'UNSEEN'):
 
             # Keep retry for real processing errors; ignore non-processable emails.
             if email_log["estado"] in {"procesado", "ignorado"}:
-                mail.store(num, '+FLAGS', '\\Seen')
+                mail.store(num, "+FLAGS", "\\Seen")
 
         mail.logout()
         return summary

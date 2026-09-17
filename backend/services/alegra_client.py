@@ -194,7 +194,9 @@ def _build_bill_observations(factura: FacturaDIAN, max_length: int = 500) -> str
     else:
         concept_text = "Sin detalle de items"
 
-    footer = f"Factura DIAN {factura.numero_factura or ''} | CUFE {factura.cufe or 'N/A'}"
+    footer = (
+        f"Factura DIAN {factura.numero_factura or ''} | CUFE {factura.cufe or 'N/A'}"
+    )
     text = f"Concepto: {concept_text}. {footer}".strip()
     if len(text) <= max_length:
         return text
@@ -206,7 +208,9 @@ def _build_bill_observations(factura: FacturaDIAN, max_length: int = 500) -> str
 
 
 class AlegraClient:
-    def __init__(self, http_client_factory: Callable[[], httpx.AsyncClient] | None = None):
+    def __init__(
+        self, http_client_factory: Callable[[], httpx.AsyncClient] | None = None
+    ):
         auth_str = f"{settings.ALEGRA_EMAIL}:{settings.ALEGRA_TOKEN}"
         self.auth_header = base64.b64encode(auth_str.encode()).decode()
         self.headers = {
@@ -263,7 +267,9 @@ class AlegraClient:
     async def get_categories(self, client: httpx.AsyncClient):
         if self._categories:
             return self._categories
-        res = await client.get(f"{self.base_url}/categories?type=expense", headers=self.headers)
+        res = await client.get(
+            f"{self.base_url}/categories?type=expense", headers=self.headers
+        )
         if res.status_code != 200:
             raise RemoteAPIError(f"Error Alegra API al listar categorias: {res.text}")
         data = res.json()
@@ -276,7 +282,9 @@ class AlegraClient:
             return self._cost_centers
         res = await client.get(f"{self.base_url}/cost-centers", headers=self.headers)
         if res.status_code != 200:
-            raise RemoteAPIError(f"Error Alegra API al listar centros de costo: {res.text}")
+            raise RemoteAPIError(
+                f"Error Alegra API al listar centros de costo: {res.text}"
+            )
         data = res.json()
         self._cost_centers = data.get("data", data) if isinstance(data, dict) else data
         return self._cost_centers
@@ -312,7 +320,9 @@ class AlegraClient:
                     "id": tax_id,
                     "name": row.get("name"),
                     "type": str(row.get("type") or "").strip().upper(),
-                    "percentage": _to_float(row.get("percentage") or row.get("rate"), 0.0),
+                    "percentage": _to_float(
+                        row.get("percentage") or row.get("rate"), 0.0
+                    ),
                 }
             )
 
@@ -375,9 +385,7 @@ class AlegraClient:
             score += int(abs(pct - target) * 100)
             return score
 
-        candidates.sort(
-            key=rank
-        )
+        candidates.sort(key=rank)
 
         chosen = candidates[0].get("id")
         if chosen is None:
@@ -405,42 +413,64 @@ class AlegraClient:
         params["start"] = safe_start
         params["limit"] = safe_limit
 
-        res = await client.get(f"{self.base_url}/contacts", params=params, headers=self.headers)
+        res = await client.get(
+            f"{self.base_url}/contacts", params=params, headers=self.headers
+        )
         if res.status_code != 200:
             raise RemoteAPIError(f"Error Alegra API al listar contactos: {res.text}")
         return _extract_contacts(res.json())
 
     async def get_contact(self, client: httpx.AsyncClient, contact_id: str):
-        res = await client.get(f"{self.base_url}/contacts/{contact_id}", headers=self.headers)
+        res = await client.get(
+            f"{self.base_url}/contacts/{contact_id}", headers=self.headers
+        )
         if res.status_code != 200:
-            raise RemoteAPIError(f"Error Alegra API al consultar contacto {contact_id}: {res.text}")
+            raise RemoteAPIError(
+                f"Error Alegra API al consultar contacto {contact_id}: {res.text}"
+            )
         data = res.json()
         return data.get("data", data) if isinstance(data, dict) else data
 
     async def create_contact(self, client: httpx.AsyncClient, payload: dict):
-        res = await client.post(f"{self.base_url}/contacts", json=payload, headers=self.headers)
+        res = await client.post(
+            f"{self.base_url}/contacts", json=payload, headers=self.headers
+        )
         if res.status_code not in [200, 201]:
             raise RemoteAPIError(f"Error Alegra API al crear contacto: {res.text}")
         data = res.json()
         return data.get("data", data) if isinstance(data, dict) else data
 
-    async def update_contact(self, client: httpx.AsyncClient, contact_id: str, payload: dict):
-        res = await client.put(f"{self.base_url}/contacts/{contact_id}", json=payload, headers=self.headers)
+    async def update_contact(
+        self, client: httpx.AsyncClient, contact_id: str, payload: dict
+    ):
+        res = await client.put(
+            f"{self.base_url}/contacts/{contact_id}", json=payload, headers=self.headers
+        )
         if res.status_code not in [200, 201]:
-            raise RemoteAPIError(f"Error Alegra API al actualizar contacto {contact_id}: {res.text}")
+            raise RemoteAPIError(
+                f"Error Alegra API al actualizar contacto {contact_id}: {res.text}"
+            )
         data = res.json()
         return data.get("data", data) if isinstance(data, dict) else data
 
     async def delete_contact(self, client: httpx.AsyncClient, contact_id: str):
-        res = await client.delete(f"{self.base_url}/contacts/{contact_id}", headers=self.headers)
+        res = await client.delete(
+            f"{self.base_url}/contacts/{contact_id}", headers=self.headers
+        )
         if res.status_code not in [200, 202, 204]:
-            raise RemoteAPIError(f"Error Alegra API al eliminar contacto {contact_id}: {res.text}")
+            raise RemoteAPIError(
+                f"Error Alegra API al eliminar contacto {contact_id}: {res.text}"
+            )
         return True
 
-    async def resolve_provider_contact(self, client: httpx.AsyncClient, nit: str, nombre: str) -> dict:
+    async def resolve_provider_contact(
+        self, client: httpx.AsyncClient, nit: str, nombre: str
+    ) -> dict:
         normalized_nit = _normalize_nit(nit)
 
-        async def find_by_identification(value: str | None, *, contact_type: str | None = "provider"):
+        async def find_by_identification(
+            value: str | None, *, contact_type: str | None = "provider"
+        ):
             if not value:
                 return None
             params = {"identification": value}
@@ -455,7 +485,9 @@ class AlegraClient:
                 return None
             contacts = _extract_contacts(res.json())
             for contact in contacts:
-                contact_id_number = _normalize_nit(str(contact.get("identification") or ""))
+                contact_id_number = _normalize_nit(
+                    str(contact.get("identification") or "")
+                )
                 if contact_id_number == _normalize_nit(value):
                     return contact
             if contacts:
@@ -467,7 +499,9 @@ class AlegraClient:
             return provider
 
         if normalized_nit != _normalize_nit(nit):
-            provider = await find_by_identification(normalized_nit, contact_type="provider")
+            provider = await find_by_identification(
+                normalized_nit, contact_type="provider"
+            )
             if provider:
                 return provider
 
@@ -488,7 +522,9 @@ class AlegraClient:
             "identification": nit,
             "type": ["provider"],
         }
-        create_res = await client.post(f"{self.base_url}/contacts", json=payload, headers=self.headers)
+        create_res = await client.post(
+            f"{self.base_url}/contacts", json=payload, headers=self.headers
+        )
         if create_res.status_code in [201, 200]:
             created = create_res.json()
             if isinstance(created, dict):
@@ -506,19 +542,28 @@ class AlegraClient:
             _is_duplicate_bill_error(create_error_text)
             or "exists" in lower_error
             or "ya existe" in lower_error
-            or (isinstance(create_error_payload, dict) and str(create_error_payload.get("code") or "") == "2006")
+            or (
+                isinstance(create_error_payload, dict)
+                and str(create_error_payload.get("code") or "") == "2006"
+            )
         )
 
         if duplicate_contact:
             provider = await find_by_identification(nit, contact_type="provider")
             if not provider and normalized_nit:
-                provider = await find_by_identification(normalized_nit, contact_type="provider")
+                provider = await find_by_identification(
+                    normalized_nit, contact_type="provider"
+                )
             if not provider:
                 provider = await find_by_identification(nit, contact_type=None)
             if not provider and normalized_nit:
-                provider = await find_by_identification(normalized_nit, contact_type=None)
+                provider = await find_by_identification(
+                    normalized_nit, contact_type=None
+                )
             if not provider:
-                contact_id = _extract_contact_id_from_error_payload(create_error_payload)
+                contact_id = _extract_contact_id_from_error_payload(
+                    create_error_payload
+                )
                 if contact_id:
                     try:
                         provider = await self.get_contact(client, contact_id)
@@ -531,7 +576,9 @@ class AlegraClient:
             f"No se pudo encontrar ni crear el proveedor con NIT {nit} en Alegra. Detalle: {create_error_text}"
         )
 
-    async def find_provider_contact_by_nit(self, client: httpx.AsyncClient, nit: str) -> dict | None:
+    async def find_provider_contact_by_nit(
+        self, client: httpx.AsyncClient, nit: str
+    ) -> dict | None:
         normalized_nit = _normalize_nit(nit)
         if not normalized_nit:
             return None
@@ -571,7 +618,9 @@ class AlegraClient:
             if provider_id:
                 params["provider"] = provider_id
 
-            res = await client.get(f"{self.base_url}/bills", params=params, headers=self.headers)
+            res = await client.get(
+                f"{self.base_url}/bills", params=params, headers=self.headers
+            )
             if res.status_code != 200:
                 continue
 
@@ -582,7 +631,11 @@ class AlegraClient:
             for bill in bills:
                 number_raw = _extract_bill_number(bill)
                 number = _normalize_invoice_ref(number_raw)
-                if number == target or number.endswith(target) or target.endswith(number):
+                if (
+                    number == target
+                    or number.endswith(target)
+                    or target.endswith(number)
+                ):
                     return bill
 
             if len(bills) < 30:
@@ -590,12 +643,16 @@ class AlegraClient:
 
         return None
 
-    async def get_bill_by_id(self, client: httpx.AsyncClient, bill_id: str) -> dict | None:
+    async def get_bill_by_id(
+        self, client: httpx.AsyncClient, bill_id: str
+    ) -> dict | None:
         res = await client.get(f"{self.base_url}/bills/{bill_id}", headers=self.headers)
         if res.status_code == 404:
             return None
         if res.status_code != 200:
-            raise RemoteAPIError(f"Error Alegra API al consultar bill {bill_id}: {res.text}")
+            raise RemoteAPIError(
+                f"Error Alegra API al consultar bill {bill_id}: {res.text}"
+            )
 
         data = res.json()
         return data.get("data", data) if isinstance(data, dict) else data
@@ -611,8 +668,14 @@ class AlegraClient:
             return None
 
         async with self._http_client_factory() as client:
-            provider = await self.find_provider_contact_by_nit(client, nit_proveedor or "")
-            provider_id = str(provider.get("id")) if isinstance(provider, dict) and provider.get("id") is not None else None
+            provider = await self.find_provider_contact_by_nit(
+                client, nit_proveedor or ""
+            )
+            provider_id = (
+                str(provider.get("id"))
+                if isinstance(provider, dict) and provider.get("id") is not None
+                else None
+            )
 
             bill = await self._find_bill_by_number(
                 client,
@@ -643,31 +706,47 @@ class AlegraClient:
         provider = await self.resolve_provider_contact(client, nit, nombre)
         provider_id = provider.get("id") if isinstance(provider, dict) else None
         if provider_id is None:
-            raise RemoteAPIError(f"No se pudo resolver id de proveedor en Alegra para NIT {nit}.")
+            raise RemoteAPIError(
+                f"No se pudo resolver id de proveedor en Alegra para NIT {nit}."
+            )
         return provider_id
 
     async def crear_bill(self, factura: FacturaDIAN):
         if not factura.nit_proveedor:
-            raise RemoteAPIError("No se puede causar en Alegra: El NIT del proveedor esta vacio.")
+            raise RemoteAPIError(
+                "No se puede causar en Alegra: El NIT del proveedor esta vacio."
+            )
         if not factura.items or len(factura.items) == 0:
-            raise RemoteAPIError("No se puede causar en Alegra: La factura no tiene items.")
+            raise RemoteAPIError(
+                "No se puede causar en Alegra: La factura no tiene items."
+            )
         if not factura.total or factura.total <= 0:
-            raise RemoteAPIError("No se puede causar en Alegra: El total de la factura es invalido o cero.")
+            raise RemoteAPIError(
+                "No se puede causar en Alegra: El total de la factura es invalido o cero."
+            )
 
         async with self._http_client_factory() as client:
-            provider_id = await self.get_provider_id(client, factura.nit_proveedor, factura.nombre_proveedor)
+            provider_id = await self.get_provider_id(
+                client, factura.nit_proveedor, factura.nombre_proveedor
+            )
             taxes = await self.get_taxes(client)
             now_local = now_bogota()
-            provider_tax_mode = resolve_provider_tax_mode(factura.nit_proveedor, factura.nombre_proveedor)
+            provider_tax_mode = resolve_provider_tax_mode(
+                factura.nit_proveedor, factura.nombre_proveedor
+            )
 
             categories_payload = []
             cost_center_ids: list[int] = []
             for item in factura.items:
                 categoria_id = _extract_numeric_id(item.cuenta_contable_alegra)
                 if categoria_id is None:
-                    categoria_id = _extract_numeric_id(settings.ALEGRA_CUENTA_DEFAULT_GASTOS)
+                    categoria_id = _extract_numeric_id(
+                        settings.ALEGRA_CUENTA_DEFAULT_GASTOS
+                    )
                 if categoria_id is None:
-                    raise RemoteAPIError("No se pudo resolver la cuenta contable para la causacion en Alegra.")
+                    raise RemoteAPIError(
+                        "No se pudo resolver la cuenta contable para la causacion en Alegra."
+                    )
 
                 centro_costo_id = _extract_numeric_id(item.centro_costo_alegra)
                 if centro_costo_id is not None:
@@ -677,7 +756,9 @@ class AlegraClient:
                     "id": categoria_id,
                     "price": item.precio_unitario,
                     "quantity": item.cantidad,
-                    "costCenter": {"id": centro_costo_id} if centro_costo_id is not None else None,
+                    "costCenter": (
+                        {"id": centro_costo_id} if centro_costo_id is not None else None
+                    ),
                 }
 
                 iva_porcentaje = _to_float(getattr(item, "iva_porcentaje", 0.0), 0.0)
@@ -704,20 +785,30 @@ class AlegraClient:
                 resolved_bill_cost_center = cost_center_ids[0]
 
             payload = {
-                "date": factura.fecha_emision.strftime("%Y-%m-%d") if factura.fecha_emision else now_local.strftime("%Y-%m-%d"),
-                "dueDate": (factura.fecha_vencimiento or factura.fecha_emision or now_local).strftime("%Y-%m-%d"),
+                "date": (
+                    factura.fecha_emision.strftime("%Y-%m-%d")
+                    if factura.fecha_emision
+                    else now_local.strftime("%Y-%m-%d")
+                ),
+                "dueDate": (
+                    factura.fecha_vencimiento or factura.fecha_emision or now_local
+                ).strftime("%Y-%m-%d"),
                 "provider": {"id": provider_id},
-                "costCenter": {"id": resolved_bill_cost_center} if resolved_bill_cost_center is not None else None,
+                "costCenter": (
+                    {"id": resolved_bill_cost_center}
+                    if resolved_bill_cost_center is not None
+                    else None
+                ),
                 "numberTemplate": {
                     "number": factura.numero_factura,
                 },
-                "purchases": {
-                    "categories": categories_payload
-                },
+                "purchases": {"categories": categories_payload},
                 "observations": _build_bill_observations(factura),
             }
 
-            res = await client.post(f"{self.base_url}/bills", json=payload, headers=self.headers)
+            res = await client.post(
+                f"{self.base_url}/bills", json=payload, headers=self.headers
+            )
             if res.status_code in [200, 201]:
                 return res.json()
 
@@ -729,7 +820,9 @@ class AlegraClient:
                 error_payload = None
 
             if _is_duplicate_bill_error(error_text):
-                raise AlegraDuplicateBillError("La factura ya fue causada en Alegra (documento duplicado).")
+                raise AlegraDuplicateBillError(
+                    "La factura ya fue causada en Alegra (documento duplicado)."
+                )
 
             raise RemoteAPIError(
                 f"Error Alegra API al crear Bill: {error_text}",

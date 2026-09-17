@@ -12,11 +12,19 @@ _mapping_cursor = 0
 _BATCH_SIZE = 100
 _MAX_CONCURRENCY = 5
 
+
 def start_scheduler():
-    scheduler.add_job(check_emails, 'interval', minutes=5)
+    scheduler.add_job(check_emails, "interval", minutes=5)
     # Recompute provider->account mappings every 6 hours
     try:
-        scheduler.add_job(_recompute_mappings_job, 'interval', hours=6, max_instances=1, coalesce=True, misfire_grace_time=300)
+        scheduler.add_job(
+            _recompute_mappings_job,
+            "interval",
+            hours=6,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
     except Exception:
         # Fallback: ignore scheduler job registration failures
         pass
@@ -38,10 +46,13 @@ async def _recompute_mappings_job():
                 max_concurrency=_MAX_CONCURRENCY,
             )
             _mapping_cursor = result.get("next_index", 0)
-            logger.info("recompute_mappings_done", extra={
-                "batch_size": result.get("batch_size"),
-                "total": result.get("total"),
-                "next_index": _mapping_cursor,
-            })
+            logger.info(
+                "recompute_mappings_done",
+                extra={
+                    "batch_size": result.get("batch_size"),
+                    "total": result.get("total"),
+                    "next_index": _mapping_cursor,
+                },
+            )
         except Exception as exc:
             logger.error("recompute_mappings_failed", extra={"error": str(exc)})

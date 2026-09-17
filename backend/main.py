@@ -73,7 +73,9 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     request_id = getattr(request.state, "request_id", None)
-    logging.getLogger("api").exception("unhandled_error", extra={"request_id": request_id})
+    logging.getLogger("api").exception(
+        "unhandled_error", extra={"request_id": request_id}
+    )
     return JSONResponse(
         status_code=500,
         content={
@@ -83,6 +85,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 app.include_router(facturas.router, prefix="/api")
 app.include_router(proceso.router, prefix="/api")
 app.include_router(config.router, prefix="/api")
@@ -90,11 +93,13 @@ app.include_router(logs.router, prefix="/api")
 app.include_router(contactos.router, prefix="/api")
 app.include_router(providers.router, prefix="/api")
 
+
 @app.get("/metrics")
 def metrics():
     if not settings.METRICS_ENABLED:
         return JSONResponse(status_code=404, content={"message": "metrics disabled"})
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/")
 def read_root():

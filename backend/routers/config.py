@@ -41,9 +41,11 @@ async def resolve_alegra_provider(
         "nombre": nombre,
     }
 
+
 @router.get("/")
 async def list_config_cuentas(activo: bool | None = None):
     return await run_in_executor(lambda: repo_list_config_cuentas(activo=activo))
+
 
 @router.post("/")
 async def create_config_cuenta(payload: dict):
@@ -52,12 +54,16 @@ async def create_config_cuenta(payload: dict):
         raise HTTPException(status_code=400, detail="No se pudo crear el registro")
     return created
 
+
 @router.patch("/{config_id}")
 async def update_config_cuenta(config_id: str, payload: dict):
-    updated = await run_in_executor(lambda: repo_update_config_cuenta(config_id, payload))
+    updated = await run_in_executor(
+        lambda: repo_update_config_cuenta(config_id, payload)
+    )
     if not updated:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
     return updated
+
 
 @router.delete("/{config_id}")
 async def delete_config_cuenta(config_id: str):

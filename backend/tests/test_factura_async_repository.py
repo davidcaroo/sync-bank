@@ -33,7 +33,9 @@ async def test_sync_causacion_repository_adapter_calls_save(monkeypatch):
     def fake_save_causacion(payload):
         observed["payload"] = payload
 
-    monkeypatch.setattr("repositories.factura_repository.save_causacion", fake_save_causacion)
+    monkeypatch.setattr(
+        "repositories.factura_repository.save_causacion", fake_save_causacion
+    )
 
     adapter = SyncCausacionRepositoryAdapter(run_in_executor=fake_run_in_executor)
 

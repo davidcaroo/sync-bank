@@ -27,6 +27,7 @@ def _to_float(value: str | None, default: float = 0.0) -> float:
     except ValueError:
         return default
 
+
 class DIANParser:
     def __init__(self) -> None:
         self.namespaces = {
@@ -114,37 +115,71 @@ class DIANParser:
 
     def _extract_nit_proveedor(self, tree) -> str:
         nit_proveedor_raw = (
-            self._get_text(tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID")
-            or self._get_text(tree, "//cac:SenderParty/cac:PartyTaxScheme/cbc:CompanyID")
-            or self._get_text(tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID")
+            self._get_text(
+                tree,
+                "//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID",
+            )
+            or self._get_text(
+                tree, "//cac:SenderParty/cac:PartyTaxScheme/cbc:CompanyID"
+            )
+            or self._get_text(
+                tree,
+                "//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID",
+            )
             or ""
         )
         return _normalize_nit(nit_proveedor_raw) or "999999999"
 
     def _extract_nombre_proveedor(self, tree) -> str:
         return (
-            self._get_text(tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name")
-            or self._get_text(tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:RegistrationName")
-            or self._get_text(tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName")
+            self._get_text(
+                tree, "//cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name"
+            )
+            or self._get_text(
+                tree,
+                "//cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:RegistrationName",
+            )
+            or self._get_text(
+                tree,
+                "//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName",
+            )
             or self._get_text(tree, "//cac:PartyName/cbc:Name")
             or "Proveedor Generico"
         )
 
     def _extract_nit_receptor(self, tree) -> str:
         nit_receptor_raw = (
-            self._get_text(tree, "//cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID")
-            or self._get_text(tree, "//cac:ReceiverParty/cac:PartyTaxScheme/cbc:CompanyID")
-            or self._get_text(tree, "//cac:AccountingCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID")
+            self._get_text(
+                tree,
+                "//cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID",
+            )
+            or self._get_text(
+                tree, "//cac:ReceiverParty/cac:PartyTaxScheme/cbc:CompanyID"
+            )
+            or self._get_text(
+                tree,
+                "//cac:AccountingCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:CompanyID",
+            )
             or ""
         )
         return _normalize_nit(nit_receptor_raw) or "123456789"
 
     def _extract_totals(self, tree) -> dict:
-        subtotal = _to_float(self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:LineExtensionAmount"))
-        tax_inclusive = _to_float(self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount"))
-        payable_amount = _to_float(self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:PayableAmount"))
-        allowances_total = _to_float(self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:AllowanceTotalAmount"))
-        charges_total = _to_float(self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:ChargeTotalAmount"))
+        subtotal = _to_float(
+            self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:LineExtensionAmount")
+        )
+        tax_inclusive = _to_float(
+            self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount")
+        )
+        payable_amount = _to_float(
+            self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:PayableAmount")
+        )
+        allowances_total = _to_float(
+            self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:AllowanceTotalAmount")
+        )
+        charges_total = _to_float(
+            self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:ChargeTotalAmount")
+        )
         prepaid_amount = _to_float(
             self._get_text(tree, "//cac:LegalMonetaryTotal/cbc:PrepaidAmount")
             or self._get_text(tree, "//cbc:PrepaidAmount")
@@ -187,7 +222,9 @@ class DIANParser:
             scheme_id = ""
             scheme_name = ""
 
-            scheme_id_nodes = subtotal_node.xpath("cac:TaxCategory/cac:TaxScheme/cbc:ID", namespaces=self.namespaces)
+            scheme_id_nodes = subtotal_node.xpath(
+                "cac:TaxCategory/cac:TaxScheme/cbc:ID", namespaces=self.namespaces
+            )
             if scheme_id_nodes and getattr(scheme_id_nodes[0], "text", None):
                 scheme_id = scheme_id_nodes[0].text.strip().upper()
 
@@ -198,17 +235,25 @@ class DIANParser:
             if scheme_name_nodes and getattr(scheme_name_nodes[0], "text", None):
                 scheme_name = scheme_name_nodes[0].text.strip().lower()
 
-            tax_amount_nodes = subtotal_node.xpath("cbc:TaxAmount", namespaces=self.namespaces)
+            tax_amount_nodes = subtotal_node.xpath(
+                "cbc:TaxAmount", namespaces=self.namespaces
+            )
             amount = _to_float(tax_amount_nodes[0].text if tax_amount_nodes else None)
 
             if "ica" in scheme_name or scheme_id in {"08", "ICA"}:
                 rete_ica += amount
-            elif "fuente" in scheme_name or "renta" in scheme_name or scheme_id in {"06", "RETEFUENTE"}:
+            elif (
+                "fuente" in scheme_name
+                or "renta" in scheme_name
+                or scheme_id in {"06", "RETEFUENTE"}
+            ):
                 rete_fuente += amount
             elif "iva" in scheme_name or scheme_id in {"04", "RETEIVA"}:
                 rete_iva += amount
 
-        withholding_total = self._sum_texts(tree, "//cac:WithholdingTaxTotal/cbc:TaxAmount")
+        withholding_total = self._sum_texts(
+            tree, "//cac:WithholdingTaxTotal/cbc:TaxAmount"
+        )
         if withholding_total <= 0:
             withholding_total = rete_fuente + rete_ica + rete_iva
 
@@ -245,7 +290,11 @@ class DIANParser:
 
         if payable_amount > 0:
             total = payable_amount
-            if withholding_total > 0 and tax_inclusive > 0 and abs(payable_amount - tax_inclusive) < 0.01:
+            if (
+                withholding_total > 0
+                and tax_inclusive > 0
+                and abs(payable_amount - tax_inclusive) < 0.01
+            ):
                 total = net_from_components
         else:
             total = net_from_components
@@ -264,10 +313,19 @@ class DIANParser:
         items: list[FacturaItem] = []
         lines = tree.xpath("//cac:InvoiceLine", namespaces=self.namespaces)
         for line in lines:
-            descripcion = self._get_line_text(line, "cac:Item/cbc:Description", default="Articulo sin descripcion")
-            cantidad = _to_float(self._get_line_text(line, "cbc:InvoicedQuantity", default="1"), default=1.0)
-            precio = _to_float(self._get_line_text(line, "cac:Price/cbc:PriceAmount", default="0"))
-            total_linea = _to_float(self._get_line_text(line, "cbc:LineExtensionAmount", default="0"))
+            descripcion = self._get_line_text(
+                line, "cac:Item/cbc:Description", default="Articulo sin descripcion"
+            )
+            cantidad = _to_float(
+                self._get_line_text(line, "cbc:InvoicedQuantity", default="1"),
+                default=1.0,
+            )
+            precio = _to_float(
+                self._get_line_text(line, "cac:Price/cbc:PriceAmount", default="0")
+            )
+            total_linea = _to_float(
+                self._get_line_text(line, "cbc:LineExtensionAmount", default="0")
+            )
 
             descuento = 0.0
             allowance_nodes = line.xpath(
@@ -301,7 +359,9 @@ class DIANParser:
 
     def _parse_issue_date(self, fecha_emision_raw: str | None):
         try:
-            return parser.parse(fecha_emision_raw) if fecha_emision_raw else now_bogota()
+            return (
+                parser.parse(fecha_emision_raw) if fecha_emision_raw else now_bogota()
+            )
         except (ParserError, TypeError, ValueError):
             return now_bogota()
 

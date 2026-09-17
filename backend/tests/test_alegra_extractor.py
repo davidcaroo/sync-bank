@@ -38,15 +38,22 @@ class FakeClient:
 
 @pytest.mark.asyncio
 async def test_alegra_extractor_counts_accounts(monkeypatch):
-    monkeypatch.setattr("services.provider_mapping.extractor.httpx.AsyncClient", FakeClient)
+    monkeypatch.setattr(
+        "services.provider_mapping.extractor.httpx.AsyncClient", FakeClient
+    )
 
     async def fake_find_provider(*args, **kwargs):
         return {"id": "123"}
 
-    monkeypatch.setattr("services.provider_mapping.extractor.alegra_service.find_provider_contact_by_nit", fake_find_provider)
+    monkeypatch.setattr(
+        "services.provider_mapping.extractor.alegra_service.find_provider_contact_by_nit",
+        fake_find_provider,
+    )
 
     extractor = AlegraExtractor()
-    counter, total = await extractor.get_account_counts("9001", max_pages=1, page_size=30, max_bills=10)
+    counter, total = await extractor.get_account_counts(
+        "9001", max_pages=1, page_size=30, max_bills=10
+    )
 
     assert total == 3
     assert counter["6001"] == 2

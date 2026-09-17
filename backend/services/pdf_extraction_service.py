@@ -5,13 +5,17 @@ from config import settings
 
 logger = logging.getLogger("pdf-extraction")
 
+
 class PdfExtractionError(Exception):
     def __init__(self, status_code: int, detail: str) -> None:
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
 
-async def extraer_pdf_from_bytes(filename: str, content: bytes, *, preview: bool = True) -> dict:
+
+async def extraer_pdf_from_bytes(
+    filename: str, content: bytes, *, preview: bool = True
+) -> dict:
     if not filename or not filename.lower().endswith(".pdf"):
         raise PdfExtractionError(400, "Solo se aceptan archivos PDF")
     if not content:

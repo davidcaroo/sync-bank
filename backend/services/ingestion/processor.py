@@ -1,5 +1,8 @@
 from config import settings
-from services.ingestion.contracts import FacturaRepositoryPort, ProviderConfigRepositoryPort
+from services.ingestion.contracts import (
+    FacturaRepositoryPort,
+    ProviderConfigRepositoryPort,
+)
 from services.ai_service import clasificar_item
 
 
@@ -46,7 +49,9 @@ class IngestionProcessor:
         preview_items = []
         ai_cache = {}
 
-        config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+        config = await self._provider_config_repository.get_config_cuenta(
+            factura.nit_proveedor
+        )
         historical_hint = None
 
         if not config:
@@ -55,24 +60,32 @@ class IngestionProcessor:
 
                 if preview_mode:
                     # Keep preview fast: use local historical hint only.
-                    historical_hint = await provider_mapping_service.suggest_mapping_from_history(
-                        factura.nit_proveedor,
-                        min_occurrences=2,
-                        min_share=0.6,
+                    historical_hint = (
+                        await provider_mapping_service.suggest_mapping_from_history(
+                            factura.nit_proveedor,
+                            min_occurrences=2,
+                            min_share=0.6,
+                        )
                     )
                 else:
                     await provider_mapping_service.compute_and_save_mapping(
                         factura.nit_proveedor, factura.nombre_proveedor
                     )
-                    config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+                    config = await self._provider_config_repository.get_config_cuenta(
+                        factura.nit_proveedor
+                    )
                     if not config:
-                        historical_hint = await provider_mapping_service.suggest_mapping_from_history(
-                            factura.nit_proveedor,
-                            min_occurrences=2,
-                            min_share=0.6,
+                        historical_hint = (
+                            await provider_mapping_service.suggest_mapping_from_history(
+                                factura.nit_proveedor,
+                                min_occurrences=2,
+                                min_share=0.6,
+                            )
                         )
             except Exception:
-                config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+                config = await self._provider_config_repository.get_config_cuenta(
+                    factura.nit_proveedor
+                )
 
         for item in factura.items:
             prefill_source = "none"
@@ -104,7 +117,9 @@ class IngestionProcessor:
                 if desc_key in ai_cache:
                     classification = ai_cache[desc_key]
                 else:
-                    classification = await clasificar_item(item.descripcion, categories or [], cost_centers or [])
+                    classification = await clasificar_item(
+                        item.descripcion, categories or [], cost_centers or []
+                    )
                     ai_cache[desc_key] = classification
                 suggested_cuenta = classification.get("cuenta_id")
                 suggested_centro = classification.get("centro_costo_id")
@@ -113,7 +128,10 @@ class IngestionProcessor:
                 except Exception:
                     confidence = 0.0
 
-                if confidence is not None and confidence >= settings.AI_CONFIDENCE_THRESHOLD:
+                if (
+                    confidence is not None
+                    and confidence >= settings.AI_CONFIDENCE_THRESHOLD
+                ):
                     cuenta_to_save = suggested_cuenta
                     centro_to_save = suggested_centro
                     prefill_source = "ai"
@@ -123,7 +141,11 @@ class IngestionProcessor:
                         centro_to_save = suggested_centro
                         prefill_source = "ai_auto"
                     else:
-                        prefill_source = "ai_suggestion" if (suggested_cuenta or suggested_centro) else "none"
+                        prefill_source = (
+                            "ai_suggestion"
+                            if (suggested_cuenta or suggested_centro)
+                            else "none"
+                        )
 
             # Build preview item (contains suggestions and confidence)
             preview_item = {
@@ -161,12 +183,18 @@ class IngestionProcessor:
 
             prefilled_items.append(save_item)
 
-        duplicate = bool(await self._factura_repository.find_by_cufe(factura.cufe)) if factura.cufe else False
+        duplicate = (
+            bool(await self._factura_repository.find_by_cufe(factura.cufe))
+            if factura.cufe
+            else False
+        )
 
         factura_preview = {
             "cufe": factura.cufe,
             "numero_factura": factura.numero_factura,
-            "fecha_emision": factura.fecha_emision.isoformat() if factura.fecha_emision else None,
+            "fecha_emision": (
+                factura.fecha_emision.isoformat() if factura.fecha_emision else None
+            ),
             "nit_proveedor": factura.nit_proveedor,
             "nombre_proveedor": factura.nombre_proveedor,
             "subtotal": factura.subtotal,
@@ -197,7 +225,9 @@ class IngestionProcessor:
         factura_payload["estado"] = "pendiente"
 
         try:
-            save_result = await self._factura_repository.save_factura(factura_payload, prefilled_items)
+            save_result = await self._factura_repository.save_factura(
+                factura_payload, prefilled_items
+            )
         except Exception as exc:
             return {
                 "file_name": xml_doc.file_name,

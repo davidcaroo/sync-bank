@@ -62,7 +62,16 @@ class ProviderMappingService:
                     await asyncio.sleep(delay)
         raise last_exc
 
-    def _log_metrics(self, *, nit: str, source: str, total: int, share: float, elapsed_ms: float, saved: bool):
+    def _log_metrics(
+        self,
+        *,
+        nit: str,
+        source: str,
+        total: int,
+        share: float,
+        elapsed_ms: float,
+        saved: bool,
+    ):
         self._logger.info(
             "provider_mapping",
             extra={
@@ -75,7 +84,9 @@ class ProviderMappingService:
             },
         )
 
-    async def compute_and_save_mapping(self, nit_proveedor: str, nombre_proveedor: str | None = None) -> Optional[dict]:
+    async def compute_and_save_mapping(
+        self, nit_proveedor: str, nombre_proveedor: str | None = None
+    ) -> Optional[dict]:
         if not nit_proveedor:
             return None
 
@@ -85,7 +96,10 @@ class ProviderMappingService:
         try:
             counter, total = await self._historical.get_account_counts(nit_proveedor)
         except Exception as exc:
-            self._logger.error("historical_extraction_failed", extra={"nit": nit_proveedor, "error": str(exc)})
+            self._logger.error(
+                "historical_extraction_failed",
+                extra={"nit": nit_proveedor, "error": str(exc)},
+            )
             counter, total = None, 0
 
         if counter and total > 0:
@@ -133,7 +147,10 @@ class ProviderMappingService:
             self._register_alegra_success()
         except Exception as exc:
             self._register_alegra_failure()
-            self._logger.error("alegra_extraction_failed", extra={"nit": nit_proveedor, "error": str(exc)})
+            self._logger.error(
+                "alegra_extraction_failed",
+                extra={"nit": nit_proveedor, "error": str(exc)},
+            )
             return None
 
         if counter and total > 0:
@@ -192,7 +209,10 @@ class ProviderMappingService:
         try:
             counter, total = await self._historical.get_account_counts(nit_proveedor)
         except Exception as exc:
-            self._logger.error("historical_suggestion_failed", extra={"nit": nit_proveedor, "error": str(exc)})
+            self._logger.error(
+                "historical_suggestion_failed",
+                extra={"nit": nit_proveedor, "error": str(exc)},
+            )
             return None
 
         if not counter or total <= 0:

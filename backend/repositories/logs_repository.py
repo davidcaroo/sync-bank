@@ -20,8 +20,11 @@ def upsert_email_log(payload: dict[str, Any]) -> None:
               updated_at = now()
             """,
             (
-                payload["mensaje_id"], payload.get("remitente"), payload.get("asunto"),
-                payload["estado"], payload.get("attachments_encontrados", 0),
+                payload["mensaje_id"],
+                payload.get("remitente"),
+                payload.get("asunto"),
+                payload["estado"],
+                payload.get("attachments_encontrados", 0),
             ),
         )
 

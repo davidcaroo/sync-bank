@@ -115,7 +115,9 @@ async def list_contactos(
     }
     resolved_type = type_map.get((tipo or "all").lower())
     if (tipo or "all").lower() not in type_map:
-        raise HTTPException(status_code=400, detail="Tipo invalido. Usa: all, provider o client.")
+        raise HTTPException(
+            status_code=400, detail="Tipo invalido. Usa: all, provider o client."
+        )
 
     start = (page - 1) * page_size
 
@@ -146,7 +148,9 @@ async def list_contactos(
         # independent of current pagination so existing contacts are not missed.
         if numeric_term:
             try:
-                async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+                async with httpx.AsyncClient(
+                    timeout=45.0, follow_redirects=True
+                ) as client:
                     by_identification = await alegra_service.list_contacts(
                         client,
                         resolved_type,
@@ -157,14 +161,18 @@ async def list_contactos(
                 for contact in by_identification:
                     item = _normalize_contact(contact)
                     item_id = str(item.get("id") or "")
-                    if item_id and all(str(existing.get("id") or "") != item_id for existing in normalized):
+                    if item_id and all(
+                        str(existing.get("id") or "") != item_id
+                        for existing in normalized
+                    ):
                         normalized.append(item)
             except Exception:
                 # Keep regular filtering path if direct identification lookup fails.
                 pass
 
         normalized = [
-            item for item in normalized
+            item
+            for item in normalized
             if term in (item.get("name") or "").lower()
             or term in (item.get("identification") or "").lower()
             or term in (item.get("email") or "").lower()
@@ -172,7 +180,8 @@ async def list_contactos(
             or term in (item.get("mobile") or "").lower()
             or (
                 numeric_term
-                and numeric_term in re.sub(r"\D", "", str(item.get("identification") or ""))
+                and numeric_term
+                in re.sub(r"\D", "", str(item.get("identification") or ""))
             )
         ]
 
@@ -203,7 +212,9 @@ async def get_contacto(contact_id: str):
 async def create_contacto(payload: ContactPayload):
     try:
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
-            data = await alegra_service.create_contact(client, _to_alegra_payload(payload))
+            data = await alegra_service.create_contact(
+                client, _to_alegra_payload(payload)
+            )
     except Exception as exc:
         raise HTTPException(
             status_code=400,
@@ -217,7 +228,9 @@ async def create_contacto(payload: ContactPayload):
 async def update_contacto(contact_id: str, payload: ContactPayload):
     try:
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
-            data = await alegra_service.update_contact(client, contact_id, _to_alegra_payload(payload))
+            data = await alegra_service.update_contact(
+                client, contact_id, _to_alegra_payload(payload)
+            )
     except Exception as exc:
         raise HTTPException(
             status_code=400,

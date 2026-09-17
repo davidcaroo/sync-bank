@@ -17,7 +17,9 @@ async def recompute_mapping(nit: str | None = None):
         res = await provider_mapping_service.compute_and_save_mapping(nit, None)
         if res:
             return {"ok": True, "result": res}
-        raise HTTPException(status_code=404, detail="No mapping computed or not enough data")
+        raise HTTPException(
+            status_code=404, detail="No mapping computed or not enough data"
+        )
 
     # No NIT provided: iterate distinct NITs from local facturas
     try:

@@ -33,14 +33,24 @@ class AlegraExtractor:
         counter = Counter()
         total = 0
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            provider = await alegra_service.find_provider_contact_by_nit(client, nit_proveedor)
-            provider_id = str(provider.get("id")) if isinstance(provider, dict) and provider.get("id") is not None else None
+            provider = await alegra_service.find_provider_contact_by_nit(
+                client, nit_proveedor
+            )
+            provider_id = (
+                str(provider.get("id"))
+                if isinstance(provider, dict) and provider.get("id") is not None
+                else None
+            )
             if not provider_id:
                 return counter, total
 
             bills_seen = 0
             for page in range(max_pages):
-                params = {"start": page * page_size, "limit": page_size, "provider": provider_id}
+                params = {
+                    "start": page * page_size,
+                    "limit": page_size,
+                    "provider": provider_id,
+                }
                 res = await client.get(
                     f"{alegra_service.base_url}/bills",
                     params=params,

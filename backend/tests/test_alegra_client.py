@@ -87,7 +87,9 @@ class _FakeClient:
         if url.endswith("/contacts"):
             identification = (params or {}).get("identification")
             contact_type = (params or {}).get("type")
-            contacts = self._contacts_by_identification.get((identification, contact_type), [])
+            contacts = self._contacts_by_identification.get(
+                (identification, contact_type), []
+            )
             return _FakeResponse(200, payload=contacts, text=str(contacts))
 
         if "/contacts/" in url:
@@ -119,7 +121,9 @@ async def test_resolve_provider_contact_uses_existing_contact_when_duplicate_cre
     client = AlegraClient()
     fake_http = _FakeClient()
 
-    provider = await client.resolve_provider_contact(fake_http, "92601258", "Proveedor Demo")
+    provider = await client.resolve_provider_contact(
+        fake_http, "92601258", "Proveedor Demo"
+    )
 
     assert provider is not None
     assert str(provider.get("id")) == "641"
@@ -130,8 +134,18 @@ def test_resolve_tax_id_for_percentage_prefers_exact_iva_match():
     taxes = [
         {"id": 1, "type": "IVA", "percentage": 0.0},
         {"id": 4, "type": "IVA", "percentage": 19.0, "name": "Iva Generado 19%"},
-        {"id": 5, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por compras"},
-        {"id": 6, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por servicios"},
+        {
+            "id": 5,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por compras",
+        },
+        {
+            "id": 6,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por servicios",
+        },
         {"id": 9, "type": "OTHER", "percentage": 19.0, "name": "otro"},
     ]
 
@@ -144,8 +158,18 @@ def test_resolve_tax_id_for_percentage_prefers_services_when_description_matches
     client = AlegraClient()
     taxes = [
         {"id": 4, "type": "IVA", "percentage": 19.0, "name": "Iva Generado 19%"},
-        {"id": 5, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por compras"},
-        {"id": 6, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por servicios"},
+        {
+            "id": 5,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por compras",
+        },
+        {
+            "id": 6,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por servicios",
+        },
     ]
 
     tax_id = client._resolve_tax_id_for_percentage(
@@ -160,8 +184,18 @@ def test_resolve_tax_id_for_percentage_prefers_services_when_description_matches
 def test_resolve_tax_id_for_percentage_forced_compras_mode_overrides_description():
     client = AlegraClient()
     taxes = [
-        {"id": 5, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por compras"},
-        {"id": 6, "type": "IVA", "percentage": 19.0, "name": "IVA desc 19% por servicios"},
+        {
+            "id": 5,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por compras",
+        },
+        {
+            "id": 6,
+            "type": "IVA",
+            "percentage": 19.0,
+            "name": "IVA desc 19% por servicios",
+        },
     ]
 
     tax_id = client._resolve_tax_id_for_percentage(

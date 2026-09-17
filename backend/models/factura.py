@@ -23,6 +23,7 @@ def _to_float(value: object, default: float = 0.0) -> float:
             return default
     return default
 
+
 class FacturaItem(BaseModel):
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
 
@@ -42,7 +43,14 @@ class FacturaItem(BaseModel):
             return ""
         return str(value).strip()
 
-    @field_validator("cantidad", "precio_unitario", "descuento", "iva_porcentaje", "total_linea", mode="before")
+    @field_validator(
+        "cantidad",
+        "precio_unitario",
+        "descuento",
+        "iva_porcentaje",
+        "total_linea",
+        mode="before",
+    )
     @classmethod
     def _normalize_numbers(cls, value: object) -> float:
         return _to_float(value)
@@ -56,7 +64,9 @@ class FacturaItem(BaseModel):
         return text or None
 
     def normalize(self) -> "FacturaItem":
-        calculated_line_total = max((self.cantidad * self.precio_unitario) - self.descuento, 0.0)
+        calculated_line_total = max(
+            (self.cantidad * self.precio_unitario) - self.descuento, 0.0
+        )
         line_total = self.total_linea if self.total_linea > 0 else calculated_line_total
         return self.model_copy(
             update={
@@ -68,6 +78,7 @@ class FacturaItem(BaseModel):
                 "total_linea": line_total,
             }
         )
+
 
 class FacturaDIAN(BaseModel):
     model_config = ConfigDict(extra="ignore", validate_assignment=True)
@@ -102,7 +113,15 @@ class FacturaDIAN(BaseModel):
     def _normalize_monetary_values(cls, value: object) -> float:
         return _to_float(value)
 
-    @field_validator("cufe", "numero_factura", "nit_proveedor", "nombre_proveedor", "nit_receptor", "moneda", mode="before")
+    @field_validator(
+        "cufe",
+        "numero_factura",
+        "nit_proveedor",
+        "nombre_proveedor",
+        "nit_receptor",
+        "moneda",
+        mode="before",
+    )
     @classmethod
     def _normalize_text_values(cls, value: object) -> Optional[str]:
         if value is None:
@@ -112,10 +131,20 @@ class FacturaDIAN(BaseModel):
 
     def normalize(self) -> "FacturaDIAN":
         normalized_items = [item.normalize() for item in self.items]
-        subtotal = self.subtotal if self.subtotal > 0 else sum(item.total_linea for item in normalized_items)
-        total_retentions = max(self.rete_fuente, 0.0) + max(self.rete_ica, 0.0) + max(self.rete_iva, 0.0)
+        subtotal = (
+            self.subtotal
+            if self.subtotal > 0
+            else sum(item.total_linea for item in normalized_items)
+        )
+        total_retentions = (
+            max(self.rete_fuente, 0.0)
+            + max(self.rete_ica, 0.0)
+            + max(self.rete_iva, 0.0)
+        )
         gross_total = subtotal + max(self.iva, 0.0)
-        total = self.total if self.total > 0 else max(gross_total - total_retentions, 0.0)
+        total = (
+            self.total if self.total > 0 else max(gross_total - total_retentions, 0.0)
+        )
 
         return self.model_copy(
             update={

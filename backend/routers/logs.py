@@ -4,6 +4,7 @@ from repositories.db_utils import run_in_executor
 
 router = APIRouter(prefix="/logs", tags=["logs"])
 
+
 @router.get("/")
 async def list_logs(
     page: int = Query(1, ge=1),

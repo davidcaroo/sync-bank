@@ -9,11 +9,14 @@ from fastapi import HTTPException
 
 from models.factura import FacturaDIAN, FacturaItem
 from observability.telemetry import get_tracer
-from repositories.factura_async_repository import SyncCausacionRepositoryAdapter, SyncFacturaRepositoryAdapter
+from repositories.factura_async_repository import (
+    SyncCausacionRepositoryAdapter,
+    SyncFacturaRepositoryAdapter,
+)
 from repositories.db_utils import run_in_executor
 from services.factura_contracts import CausacionRepositoryPort, FacturaRepositoryPort
-from services.alegra_service import alegra_service, AlegraDuplicateBillError
-from services.errors import RemoteAPIError
+from services.alegra_service import alegra_service
+from services.errors import AlegraDuplicateBillError, RemoteAPIError
 from services.ingestion_service import ingestion_service
 from services.provider_mapping_service import provider_mapping_service
 from services.timezone_service import now_bogota, to_bogota
@@ -21,6 +24,10 @@ from services.xml_parser import parse_xml_dian
 
 logger = logging.getLogger("facturas")
 tracer = get_tracer("syncbank.factura_service")
+
+
+def _parse_datetime(value: str | datetime) -> datetime:
+    return value if isinstance(value, datetime) else date_parser.parse(value)
 
 
 class FacturaService:
@@ -34,19 +41,24 @@ class FacturaService:
         self._factura_repository = factura_repository or SyncFacturaRepositoryAdapter(
             run_in_executor=run_in_executor
         )
-        self._causacion_repository = causacion_repository or SyncCausacionRepositoryAdapter(
-            run_in_executor=run_in_executor
+        self._causacion_repository = (
+            causacion_repository
+            or SyncCausacionRepositoryAdapter(run_in_executor=run_in_executor)
         )
         self._http_client_factory = http_client_factory or (
             lambda: httpx.AsyncClient(timeout=30.0, follow_redirects=True)
         )
 
-    async def _check_remote_bill_status(self, factura_data: dict, *, known_bill_id: str | None = None) -> dict:
+    async def _check_remote_bill_status(
+        self, factura_data: dict, *, known_bill_id: str | None = None
+    ) -> dict:
         """Verify if the bill still exists in Alegra for this local invoice."""
         if known_bill_id:
             try:
                 async with self._http_client_factory() as client:
-                    bill = await alegra_service.get_bill_by_id(client, str(known_bill_id))
+                    bill = await alegra_service.get_bill_by_id(
+                        client, str(known_bill_id)
+                    )
             except Exception:
                 return {"verified": False, "exists": None, "bill_id": None}
 
@@ -55,7 +67,9 @@ class FacturaService:
                 return {
                     "verified": True,
                     "exists": True,
-                    "bill_id": str(bill_id) if bill_id is not None else str(known_bill_id),
+                    "bill_id": (
+                        str(bill_id) if bill_id is not None else str(known_bill_id)
+                    ),
                 }
 
             return {"verified": True, "exists": False, "bill_id": None}
@@ -136,7 +150,9 @@ class FacturaService:
 
             if patch:
                 try:
-                    await self._factura_repository.update_item_fields(item.get("id"), patch)
+                    await self._factura_repository.update_item_fields(
+                        item.get("id"), patch
+                    )
                 except Exception:
                     continue
 
@@ -195,30 +211,48 @@ class FacturaService:
                 item["confidence"] = None
         return items
 
-    def _preview_summary(self, results: list[dict], *, total_files: int, total_xml: int) -> dict:
+    def _preview_summary(
+        self, results: list[dict], *, total_files: int, total_xml: int
+    ) -> dict:
         return {
             "total_files": total_files,
             "total_xml": total_xml,
             "valid": len([item for item in results if item.get("status") == "valid"]),
-            "invalid": len([item for item in results if item.get("status") == "invalid"]),
-            "duplicates": len([item for item in results if item.get("status") == "duplicate"]),
+            "invalid": len(
+                [item for item in results if item.get("status") == "invalid"]
+            ),
+            "duplicates": len(
+                [item for item in results if item.get("status") == "duplicate"]
+            ),
         }
 
-    def _upload_summary(self, results: list[dict], *, total_files: int, total_xml: int) -> dict:
+    def _upload_summary(
+        self, results: list[dict], *, total_files: int, total_xml: int
+    ) -> dict:
         return {
             "total_files": total_files,
             "total_xml": total_xml,
-            "created": len([item for item in results if item.get("status") == "created"]),
-            "duplicates": len([item for item in results if item.get("status") == "duplicate"]),
-            "errors": len([item for item in results if item.get("status") in {"error", "invalid"}]),
+            "created": len(
+                [item for item in results if item.get("status") == "created"]
+            ),
+            "duplicates": len(
+                [item for item in results if item.get("status") == "duplicate"]
+            ),
+            "errors": len(
+                [item for item in results if item.get("status") in {"error", "invalid"}]
+            ),
         }
 
-    async def preview_upload_facturas(self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False):
+    async def preview_upload_facturas(
+        self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False
+    ):
         extracted = await ingestion_service.extract_xml_documents_from_upload(files)
         documents = extracted.get("documents") or []
         errors = extracted.get("errors") or []
 
-        prefill_context = await ingestion_service.build_prefill_context(apply_ai=apply_ai)
+        prefill_context = await ingestion_service.build_prefill_context(
+            apply_ai=apply_ai
+        )
 
         results = list(errors)
         sem = asyncio.Semaphore(3)
@@ -236,7 +270,9 @@ class FacturaService:
                 )
 
         if documents:
-            preview_results = await asyncio.gather(*[_process_preview_doc(doc) for doc in documents])
+            preview_results = await asyncio.gather(
+                *[_process_preview_doc(doc) for doc in documents]
+            )
             results.extend(preview_results)
 
         return {
@@ -248,12 +284,16 @@ class FacturaService:
             "files": results,
         }
 
-    async def upload_facturas(self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False):
+    async def upload_facturas(
+        self, files, *, apply_ai: bool = True, auto_apply_ai: bool = False
+    ):
         extracted = await ingestion_service.extract_xml_documents_from_upload(files)
         documents = extracted.get("documents") or []
         errors = extracted.get("errors") or []
 
-        prefill_context = await ingestion_service.build_prefill_context(apply_ai=apply_ai)
+        prefill_context = await ingestion_service.build_prefill_context(
+            apply_ai=apply_ai
+        )
 
         results = list(errors)
         for xml_doc in documents:
@@ -289,7 +329,7 @@ class FacturaService:
             created_at = factura.get("created_at")
             if created_at:
                 try:
-                    created_dt = date_parser.parse(created_at)
+                    created_dt = _parse_datetime(created_at)
                     created_local = to_bogota(created_dt)
                     created_local_date = created_local.date() if created_local else None
                     if created_local_date == today_local:
@@ -305,7 +345,12 @@ class FacturaService:
             elif estado == "error":
                 errores += 1
 
-        return {"hoy": hoy, "causadas": causadas, "pendientes": pendientes, "errores": errores}
+        return {
+            "hoy": hoy,
+            "causadas": causadas,
+            "pendientes": pendientes,
+            "errores": errores,
+        }
 
     async def get_facturas(
         self,
@@ -351,7 +396,9 @@ class FacturaService:
         if not factura_data:
             raise HTTPException(status_code=404, detail="Factura no encontrada")
 
-        existing_success = await self._factura_repository.get_successful_causacion(factura_id)
+        existing_success = await self._factura_repository.get_successful_causacion(
+            factura_id
+        )
         known_bill_id = (
             str(existing_success.get("alegra_bill_id"))
             if existing_success and existing_success.get("alegra_bill_id") is not None
@@ -359,9 +406,13 @@ class FacturaService:
         )
 
         if factura_data.get("estado") == "procesado":
-            remote_status = await self._check_remote_bill_status(factura_data, known_bill_id=known_bill_id)
+            remote_status = await self._check_remote_bill_status(
+                factura_data, known_bill_id=known_bill_id
+            )
             if remote_status.get("exists") is False:
-                await self._factura_repository.update_factura_fields(factura_id, {"estado": "pendiente"})
+                await self._factura_repository.update_factura_fields(
+                    factura_id, {"estado": "pendiente"}
+                )
                 factura_data["estado"] = "pendiente"
             elif remote_status.get("exists") is None:
                 raise HTTPException(
@@ -376,20 +427,33 @@ class FacturaService:
             detail = {
                 "message": "Factura ya causada",
                 "code": "FACTURA_YA_CAUSADA",
-                "alegra_bill_id": remote_status.get("bill_id") if remote_status.get("bill_id") else (existing_success.get("alegra_bill_id") if existing_success else None),
+                "alegra_bill_id": (
+                    remote_status.get("bill_id")
+                    if remote_status.get("bill_id")
+                    else (
+                        existing_success.get("alegra_bill_id")
+                        if existing_success
+                        else None
+                    )
+                ),
             }
             raise HTTPException(status_code=409, detail=detail)
 
         if existing_success:
-            remote_status = await self._check_remote_bill_status(factura_data, known_bill_id=known_bill_id)
+            remote_status = await self._check_remote_bill_status(
+                factura_data, known_bill_id=known_bill_id
+            )
             if remote_status.get("exists") is True:
-                await self._factura_repository.update_factura_fields(factura_id, {"estado": "procesado"})
+                await self._factura_repository.update_factura_fields(
+                    factura_id, {"estado": "procesado"}
+                )
                 raise HTTPException(
                     status_code=409,
                     detail={
                         "message": "Factura ya fue causada previamente",
                         "code": "FACTURA_YA_CAUSADA",
-                        "alegra_bill_id": remote_status.get("bill_id") or existing_success.get("alegra_bill_id"),
+                        "alegra_bill_id": remote_status.get("bill_id")
+                        or existing_success.get("alegra_bill_id"),
                     },
                 )
             if remote_status.get("exists") is None:
@@ -401,7 +465,9 @@ class FacturaService:
                     },
                 )
 
-            await self._factura_repository.update_factura_fields(factura_id, {"estado": "pendiente"})
+            await self._factura_repository.update_factura_fields(
+                factura_id, {"estado": "pendiente"}
+            )
             factura_data["estado"] = "pendiente"
 
         overrides_map = overrides_map or {}
@@ -410,17 +476,24 @@ class FacturaService:
         for item in factura_data.get("items_factura", []) or []:
             override = overrides_map.get(str(item.get("id")))
             cuenta_actual = item.get("cuenta_contable_alegra")
-            cuenta_override = override.get("cuenta_contable_alegra") if override else None
-            effective_cuenta = cuenta_override if cuenta_override is not None else cuenta_actual
+            cuenta_override = (
+                override.get("cuenta_contable_alegra") if override else None
+            )
+            effective_cuenta = (
+                cuenta_override if cuenta_override is not None else cuenta_actual
+            )
             if not effective_cuenta:
                 missing_confirmation.append(str(item.get("id")))
 
         if missing_confirmation:
             try:
                 await provider_mapping_service.compute_and_save_mapping(
-                    factura_data.get("nit_proveedor"), factura_data.get("nombre_proveedor")
+                    factura_data.get("nit_proveedor"),
+                    factura_data.get("nombre_proveedor"),
                 )
-                refreshed = await self._factura_repository.get_factura_with_items(factura_id)
+                refreshed = await self._factura_repository.get_factura_with_items(
+                    factura_id
+                )
                 if refreshed:
                     factura_data = refreshed
             except Exception:
@@ -430,8 +503,12 @@ class FacturaService:
             for item in factura_data.get("items_factura", []) or []:
                 override = overrides_map.get(str(item.get("id")))
                 cuenta_actual = item.get("cuenta_contable_alegra")
-                cuenta_override = override.get("cuenta_contable_alegra") if override else None
-                effective_cuenta = cuenta_override if cuenta_override is not None else cuenta_actual
+                cuenta_override = (
+                    override.get("cuenta_contable_alegra") if override else None
+                )
+                effective_cuenta = (
+                    cuenta_override if cuenta_override is not None else cuenta_actual
+                )
                 if not effective_cuenta:
                     missing_confirmation.append(str(item.get("id")))
 
@@ -460,7 +537,9 @@ class FacturaService:
         except Exception:
             resolved_name = None
 
-        if resolved_name and resolved_name != (factura_data.get("nombre_proveedor") or ""):
+        if resolved_name and resolved_name != (
+            factura_data.get("nombre_proveedor") or ""
+        ):
             await self._factura_repository.update_factura_fields(
                 factura_id, {"nombre_proveedor": resolved_name}
             )
@@ -502,8 +581,14 @@ class FacturaService:
         factura_model = FacturaDIAN(
             cufe=factura_data.get("cufe"),
             numero_factura=factura_data.get("numero_factura"),
-            fecha_emision=date_parser.parse(factura_data.get("fecha_emision") or factura_data.get("created_at")),
-            fecha_vencimiento=date_parser.parse(factura_data["fecha_vencimiento"]) if factura_data.get("fecha_vencimiento") else None,
+            fecha_emision=_parse_datetime(
+                factura_data.get("fecha_emision") or factura_data.get("created_at")
+            ),
+            fecha_vencimiento=(
+                _parse_datetime(factura_data["fecha_vencimiento"])
+                if factura_data.get("fecha_vencimiento")
+                else None
+            ),
             nit_proveedor=factura_data.get("nit_proveedor"),
             nombre_proveedor=factura_data.get("nombre_proveedor"),
             nit_receptor=factura_data.get("nit_receptor"),
@@ -520,7 +605,9 @@ class FacturaService:
 
         try:
             alegra_response = await alegra_service.crear_bill(factura_model)
-            await self._factura_repository.update_factura_fields(factura_id, {"estado": "procesado"})
+            await self._factura_repository.update_factura_fields(
+                factura_id, {"estado": "procesado"}
+            )
             try:
                 await self._causacion_repository.save_causacion(
                     {
@@ -533,23 +620,34 @@ class FacturaService:
                     }
                 )
             except Exception as log_exc:
-                logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
+                logger.error(
+                    "causacion_log_error",
+                    extra={"factura_id": factura_id, "error": str(log_exc)},
+                )
             return alegra_response
         except AlegraDuplicateBillError as exc:
-            await self._factura_repository.update_factura_fields(factura_id, {"estado": "procesado"})
+            await self._factura_repository.update_factura_fields(
+                factura_id, {"estado": "procesado"}
+            )
             try:
                 await self._causacion_repository.save_causacion(
                     {
                         "factura_id": factura_id,
                         "alegra_bill_id": None,
-                        "alegra_response": {"error": str(exc), "code": "DUPLICADO_ALEGRA"},
+                        "alegra_response": {
+                            "error": str(exc),
+                            "code": "DUPLICADO_ALEGRA",
+                        },
                         "estado": "fallido",
                         "intentos": 1,
                         "error_msg": str(exc),
                     }
                 )
             except Exception as log_exc:
-                logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
+                logger.error(
+                    "causacion_log_error",
+                    extra={"factura_id": factura_id, "error": str(log_exc)},
+                )
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -560,7 +658,9 @@ class FacturaService:
             )
         except RemoteAPIError as exc:
             error_text = str(exc).strip() or repr(exc)
-            await self._factura_repository.update_factura_fields(factura_id, {"estado": "error"})
+            await self._factura_repository.update_factura_fields(
+                factura_id, {"estado": "error"}
+            )
             try:
                 await self._causacion_repository.save_causacion(
                     {
@@ -577,10 +677,17 @@ class FacturaService:
                     }
                 )
             except Exception as log_exc:
-                logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
+                logger.error(
+                    "causacion_log_error",
+                    extra={"factura_id": factura_id, "error": str(log_exc)},
+                )
             logger.error(
                 "causacion_error",
-                extra={"factura_id": factura_id, "error": error_text, "status": exc.status_code},
+                extra={
+                    "factura_id": factura_id,
+                    "error": error_text,
+                    "status": exc.status_code,
+                },
             )
             raise HTTPException(
                 status_code=exc.status_code or 502,
@@ -593,7 +700,9 @@ class FacturaService:
             )
         except Exception as exc:
             error_text = str(exc).strip() or repr(exc)
-            await self._factura_repository.update_factura_fields(factura_id, {"estado": "error"})
+            await self._factura_repository.update_factura_fields(
+                factura_id, {"estado": "error"}
+            )
             try:
                 await self._causacion_repository.save_causacion(
                     {
@@ -606,8 +715,13 @@ class FacturaService:
                     }
                 )
             except Exception as log_exc:
-                logger.error("causacion_log_error", extra={"factura_id": factura_id, "error": str(log_exc)})
-            logger.error("causacion_error", extra={"factura_id": factura_id, "error": error_text})
+                logger.error(
+                    "causacion_log_error",
+                    extra={"factura_id": factura_id, "error": str(log_exc)},
+                )
+            logger.error(
+                "causacion_error", extra={"factura_id": factura_id, "error": error_text}
+            )
             raise HTTPException(status_code=502, detail=error_text)
 
 

@@ -7,15 +7,22 @@ from dateutil import parser as date_parser
 
 from config import settings
 from models.factura import FacturaDIAN, FacturaItem
-from repositories.config_repository import get_config_cuenta, sync_config_proveedor_nombre
+from repositories.config_repository import (
+    get_config_cuenta,
+    sync_config_proveedor_nombre,
+)
 from repositories.db_utils import run_in_executor
 from repositories.factura_repository import find_factura_by_cufe, save_factura
-from repositories.ingestion_adapters import SyncFacturaRepositoryAdapter, SyncProviderConfigRepositoryAdapter
+from repositories.ingestion_adapters import (
+    SyncFacturaRepositoryAdapter,
+    SyncProviderConfigRepositoryAdapter,
+)
 from services.ai_service import clasificar_item
 from services.ingestion.prefill import IngestionPrefill
 from services.provider_mapping_service import provider_mapping_service
 
 logger = logging.getLogger("pdf-ingestion")
+
 
 class PdfIngestionService:
     def __init__(self) -> None:
@@ -89,30 +96,40 @@ class PdfIngestionService:
         preview_items: list[dict[str, Any]] = []
         ai_cache: dict[str, dict[str, Any]] = {}
 
-        config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+        config = await self._provider_config_repository.get_config_cuenta(
+            factura.nit_proveedor
+        )
         historical_hint = None
 
         if not config:
             try:
                 if preview_mode:
-                    historical_hint = await provider_mapping_service.suggest_mapping_from_history(
-                        factura.nit_proveedor,
-                        min_occurrences=2,
-                        min_share=0.6,
+                    historical_hint = (
+                        await provider_mapping_service.suggest_mapping_from_history(
+                            factura.nit_proveedor,
+                            min_occurrences=2,
+                            min_share=0.6,
+                        )
                     )
                 else:
                     await provider_mapping_service.compute_and_save_mapping(
                         factura.nit_proveedor, factura.nombre_proveedor
                     )
-                    config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+                    config = await self._provider_config_repository.get_config_cuenta(
+                        factura.nit_proveedor
+                    )
                     if not config:
-                        historical_hint = await provider_mapping_service.suggest_mapping_from_history(
-                            factura.nit_proveedor,
-                            min_occurrences=2,
-                            min_share=0.6,
+                        historical_hint = (
+                            await provider_mapping_service.suggest_mapping_from_history(
+                                factura.nit_proveedor,
+                                min_occurrences=2,
+                                min_share=0.6,
+                            )
                         )
             except Exception:
-                config = await self._provider_config_repository.get_config_cuenta(factura.nit_proveedor)
+                config = await self._provider_config_repository.get_config_cuenta(
+                    factura.nit_proveedor
+                )
 
         for item in factura.items:
             prefill_source = "none"
@@ -146,7 +163,9 @@ class PdfIngestionService:
                 if desc_key in ai_cache:
                     classification = ai_cache[desc_key]
                 else:
-                    classification = await clasificar_item(item.descripcion, categories or [], cost_centers or [])
+                    classification = await clasificar_item(
+                        item.descripcion, categories or [], cost_centers or []
+                    )
                     ai_cache[desc_key] = classification
                 suggested_cuenta = classification.get("cuenta_id")
                 suggested_centro = classification.get("centro_costo_id")
@@ -155,7 +174,10 @@ class PdfIngestionService:
                 except Exception:
                     confidence = 0.0
 
-                if confidence is not None and confidence >= settings.AI_CONFIDENCE_THRESHOLD:
+                if (
+                    confidence is not None
+                    and confidence >= settings.AI_CONFIDENCE_THRESHOLD
+                ):
                     cuenta_to_save = suggested_cuenta
                     centro_to_save = suggested_centro
                     prefill_source = "ai"
@@ -165,7 +187,11 @@ class PdfIngestionService:
                         centro_to_save = suggested_centro
                         prefill_source = "ai_auto"
                     else:
-                        prefill_source = "ai_suggestion" if (suggested_cuenta or suggested_centro) else "none"
+                        prefill_source = (
+                            "ai_suggestion"
+                            if (suggested_cuenta or suggested_centro)
+                            else "none"
+                        )
 
             preview_item = {
                 "descripcion": item.descripcion,
@@ -203,11 +229,15 @@ class PdfIngestionService:
 
         return prefilled_items, preview_items
 
-    def _build_factura_preview(self, factura: FacturaDIAN, preview_items: list[dict[str, Any]]) -> dict[str, Any]:
+    def _build_factura_preview(
+        self, factura: FacturaDIAN, preview_items: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         return {
             "cufe": factura.cufe,
             "numero_factura": factura.numero_factura,
-            "fecha_emision": factura.fecha_emision.isoformat() if factura.fecha_emision else None,
+            "fecha_emision": (
+                factura.fecha_emision.isoformat() if factura.fecha_emision else None
+            ),
             "nit_proveedor": factura.nit_proveedor,
             "nombre_proveedor": factura.nombre_proveedor,
             "subtotal": factura.subtotal,
@@ -234,7 +264,11 @@ class PdfIngestionService:
         auto_apply_ai: bool,
     ) -> dict[str, Any]:
         factura = self._build_factura_model(payload)
-        duplicate = bool(await self._factura_repository.find_by_cufe(factura.cufe)) if factura.cufe else False
+        duplicate = (
+            bool(await self._factura_repository.find_by_cufe(factura.cufe))
+            if factura.cufe
+            else False
+        )
 
         prefill_context = await self._prefill.build_prefill_context(apply_ai=apply_ai)
         prefilled_items, preview_items = await self._prefill_items(
@@ -264,7 +298,9 @@ class PdfIngestionService:
         factura_payload["estado"] = "pendiente"
 
         try:
-            save_result = await self._factura_repository.save_factura(factura_payload, prefilled_items)
+            save_result = await self._factura_repository.save_factura(
+                factura_payload, prefilled_items
+            )
         except Exception as exc:
             return {
                 "status": "error",
@@ -290,5 +326,6 @@ class PdfIngestionService:
             "estado": "duplicado" if is_duplicate else "pendiente",
             "factura_preview": factura_preview,
         }
+
 
 pdf_ingestion_service = PdfIngestionService()

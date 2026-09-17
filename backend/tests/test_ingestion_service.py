@@ -1,5 +1,4 @@
 import pytest
-from types import SimpleNamespace
 
 from services.ingestion_service import IngestionService, XMLDocument
 
@@ -60,11 +59,24 @@ async def test_ingestion_prefills_with_config(monkeypatch):
         return action()
 
     monkeypatch.setattr("services.ingestion_service.parse_xml_dian", fake_parse_xml)
-    monkeypatch.setattr("services.ingestion_service.run_in_executor", fake_run_in_executor)
-    monkeypatch.setattr("services.ingestion_service.get_config_cuenta", lambda nit: {"id_cuenta_alegra": "5001"})
-    monkeypatch.setattr("services.ingestion_service.sync_config_proveedor_nombre", lambda nit, nombre: None)
-    monkeypatch.setattr("services.ingestion_service.find_factura_by_cufe", lambda cufe: None)
-    monkeypatch.setattr("services.ingestion_service.save_factura", lambda data, items: {"factura_id": "1", "duplicado": False})
+    monkeypatch.setattr(
+        "services.ingestion_service.run_in_executor", fake_run_in_executor
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.get_config_cuenta",
+        lambda nit: {"id_cuenta_alegra": "5001"},
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.sync_config_proveedor_nombre",
+        lambda nit, nombre: None,
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.find_factura_by_cufe", lambda cufe: None
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.save_factura",
+        lambda data, items: {"factura_id": "1", "duplicado": False},
+    )
 
     xml_doc = XMLDocument(file_name="x.xml", entry_name="x.xml", xml_text="<xml/>")
     result = await svc.process_xml_document(

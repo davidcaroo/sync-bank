@@ -7,10 +7,11 @@ router = APIRouter(prefix="/proceso", tags=["proceso"])
 last_run = None
 last_summary = None
 
+
 @router.post("/manual")
 async def trigger_manual():
     global last_run, last_summary
-    summary = await check_emails(search_criteria='ALL')
+    summary = await check_emails(search_criteria="ALL")
     last_run = now_bogota()
     last_summary = summary or {}
 
@@ -30,6 +31,7 @@ async def trigger_manual():
         "timestamp": last_run,
         "summary": last_summary,
     }
+
 
 @router.get("/status")
 async def get_status():

@@ -16,7 +16,9 @@ from services.factura_contracts import CausacionRepositoryPort, FacturaRepositor
 
 
 class SyncFacturaRepositoryAdapter(FacturaRepositoryPort):
-    def __init__(self, *, run_in_executor: Callable[[Callable[[], Any]], Awaitable[Any]]) -> None:
+    def __init__(
+        self, *, run_in_executor: Callable[[Callable[[], Any]], Awaitable[Any]]
+    ) -> None:
         self._run_in_executor = run_in_executor
 
     async def get_successful_causacion(self, factura_id: str) -> dict[str, Any] | None:
@@ -50,15 +52,23 @@ class SyncFacturaRepositoryAdapter(FacturaRepositoryPort):
     async def get_factura_with_items(self, factura_id: str) -> dict[str, Any] | None:
         return await self._run_in_executor(lambda: get_factura_with_items(factura_id))
 
-    async def update_factura_fields(self, factura_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
-        return await self._run_in_executor(lambda: update_factura_fields(factura_id, payload))
+    async def update_factura_fields(
+        self, factura_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        return await self._run_in_executor(
+            lambda: update_factura_fields(factura_id, payload)
+        )
 
-    async def update_item_fields(self, item_id: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+    async def update_item_fields(
+        self, item_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any] | None:
         return await self._run_in_executor(lambda: update_item_fields(item_id, payload))
 
 
 class SyncCausacionRepositoryAdapter(CausacionRepositoryPort):
-    def __init__(self, *, run_in_executor: Callable[[Callable[[], Any]], Awaitable[Any]]) -> None:
+    def __init__(
+        self, *, run_in_executor: Callable[[Callable[[], Any]], Awaitable[Any]]
+    ) -> None:
         self._run_in_executor = run_in_executor
 
     async def save_causacion(self, payload: dict[str, Any]) -> None:

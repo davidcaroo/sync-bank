@@ -12,7 +12,9 @@ async def test_preview_upload_accepts_auto_apply_ai(monkeypatch):
         captured["auto_apply_ai"] = auto_apply_ai
         return {"summary": {}, "files": []}
 
-    monkeypatch.setattr("routers.facturas.factura_service.preview_upload_facturas", fake_preview)
+    monkeypatch.setattr(
+        "routers.facturas.factura_service.preview_upload_facturas", fake_preview
+    )
 
     response = await preview_upload_facturas(
         files=[object()],
