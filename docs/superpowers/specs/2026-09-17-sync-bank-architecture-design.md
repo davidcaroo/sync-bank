@@ -2,7 +2,7 @@
 
 Fecha: 2026-09-17
 
-Estado: borrador para revisión del usuario
+Estado: aprobado por el usuario
 
 Alcance: arquitectura, ingesta documental, persistencia y despliegue
 
