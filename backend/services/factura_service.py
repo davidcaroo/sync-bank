@@ -391,6 +391,63 @@ class FacturaService:
         factura["items_factura"] = self._normalize_items_prefill(items)
         return self._enrich_factura_monetary_fields(factura)
 
+    async def reconciliar_pendientes(self):
+        """Read-only sweep: check every locally 'pendiente' invoice against
+        Alegra's bills to catch cases already causadas there but not reflected
+        locally. Does not write anything."""
+        res = await self._factura_repository.get_facturas_paginated(
+            page=1, page_size=500, estado="pendiente"
+        )
+        rows = res.data or []
+
+        results = []
+        for row in rows:
+            numero_factura = row.get("numero_factura")
+            nit_proveedor = row.get("nit_proveedor")
+            try:
+                remote = await alegra_service.get_bill_accounting_by_invoice(
+                    nit_proveedor=nit_proveedor,
+                    numero_factura=numero_factura,
+                    max_pages=4,
+                )
+            except Exception as exc:
+                results.append(
+                    {
+                        "id": row.get("id"),
+                        "numero_factura": numero_factura,
+                        "nit_proveedor": nit_proveedor,
+                        "nombre_proveedor": row.get("nombre_proveedor"),
+                        "estado_local": row.get("estado"),
+                        "verificado": False,
+                        "ya_causada_en_alegra": None,
+                        "alegra_bill_id": None,
+                        "error": str(exc),
+                    }
+                )
+                continue
+
+            results.append(
+                {
+                    "id": row.get("id"),
+                    "numero_factura": numero_factura,
+                    "nit_proveedor": nit_proveedor,
+                    "nombre_proveedor": row.get("nombre_proveedor"),
+                    "estado_local": row.get("estado"),
+                    "verificado": True,
+                    "ya_causada_en_alegra": bool(remote and remote.get("bill_id")),
+                    "alegra_bill_id": remote.get("bill_id") if remote else None,
+                    "error": None,
+                }
+            )
+
+        mismatches = [r for r in results if r.get("ya_causada_en_alegra")]
+        return {
+            "total_revisadas": len(results),
+            "coinciden_pendiente": len(results) - len(mismatches),
+            "ya_causadas_en_alegra": len(mismatches),
+            "detalle": results,
+        }
+
     async def causar_factura(self, factura_id: str, overrides_map: dict | None = None):
         factura_data = await self._factura_repository.get_factura_with_items(factura_id)
         if not factura_data:

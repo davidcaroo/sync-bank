@@ -187,6 +187,14 @@ async def get_facturas_stats():
     return await factura_service.get_facturas_stats()
 
 
+@router.get("/reconciliar-alegra")
+async def reconciliar_pendientes_alegra():
+    """Read-only sweep: cross-checks every 'pendiente' invoice against
+    Alegra's bills to find ones already causadas there but not reflected
+    locally. Writes nothing."""
+    return await factura_service.reconciliar_pendientes()
+
+
 @router.get("/")
 async def get_facturas(
     page: int = Query(1, ge=1),
