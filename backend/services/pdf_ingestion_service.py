@@ -5,7 +5,6 @@ from typing import Any
 
 from dateutil import parser as date_parser
 
-from config import settings
 from models.factura import FacturaDIAN, FacturaItem
 from repositories.config_repository import (
     get_config_cuenta,
@@ -17,7 +16,6 @@ from repositories.ingestion_adapters import (
     SyncFacturaRepositoryAdapter,
     SyncProviderConfigRepositoryAdapter,
 )
-from services.ai_service import clasificar_item
 from services.ingestion.prefill import IngestionPrefill
 from services.provider_mapping_service import provider_mapping_service
 
@@ -94,8 +92,6 @@ class PdfIngestionService:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         prefilled_items: list[dict[str, Any]] = []
         preview_items: list[dict[str, Any]] = []
-        ai_cache: dict[str, dict[str, Any]] = {}
-
         config = await self._provider_config_repository.get_config_cuenta(
             factura.nit_proveedor
         )
@@ -134,9 +130,6 @@ class PdfIngestionService:
         for item in factura.items:
             prefill_source = "none"
             confidence = None
-            suggested_cuenta = None
-            suggested_centro = None
-
             cuenta_to_save = item.cuenta_contable_alegra
             centro_to_save = item.centro_costo_alegra
 
@@ -158,41 +151,6 @@ class PdfIngestionService:
                     confidence = float(historical_hint.get("confidence") or 0.0)
                 except Exception:
                     confidence = 0.0
-            elif apply_ai:
-                desc_key = (item.descripcion or "").strip().lower()
-                if desc_key in ai_cache:
-                    classification = ai_cache[desc_key]
-                else:
-                    classification = await clasificar_item(
-                        item.descripcion, categories or [], cost_centers or []
-                    )
-                    ai_cache[desc_key] = classification
-                suggested_cuenta = classification.get("cuenta_id")
-                suggested_centro = classification.get("centro_costo_id")
-                try:
-                    confidence = float(classification.get("confianza") or 0.0)
-                except Exception:
-                    confidence = 0.0
-
-                if (
-                    confidence is not None
-                    and confidence >= settings.AI_CONFIDENCE_THRESHOLD
-                ):
-                    cuenta_to_save = suggested_cuenta
-                    centro_to_save = suggested_centro
-                    prefill_source = "ai"
-                else:
-                    if auto_apply_ai and (suggested_cuenta or suggested_centro):
-                        cuenta_to_save = suggested_cuenta
-                        centro_to_save = suggested_centro
-                        prefill_source = "ai_auto"
-                    else:
-                        prefill_source = (
-                            "ai_suggestion"
-                            if (suggested_cuenta or suggested_centro)
-                            else "none"
-                        )
-
             preview_item = {
                 "descripcion": item.descripcion,
                 "cantidad": item.cantidad,
@@ -205,10 +163,6 @@ class PdfIngestionService:
                 "prefill_source": prefill_source,
                 "confidence": confidence,
             }
-
-            if prefill_source == "ai_suggestion":
-                preview_item["suggested_cuenta_contable_alegra"] = suggested_cuenta
-                preview_item["suggested_centro_costo_alegra"] = suggested_centro
 
             preview_items.append(preview_item)
 

@@ -42,7 +42,6 @@ export default function Facturas() {
   const [uploadFilesState, setUploadFilesState] = useState([])
   const [uploadMode, setUploadMode] = useState('xml')
   const [pdfFile, setPdfFile] = useState(null)
-  const [uploadApplyAi, setUploadApplyAi] = useState(true)
   const [uploadPreview, setUploadPreview] = useState(null)
   const [uploadPreviewLoading, setUploadPreviewLoading] = useState(false)
   const [uploadSaving, setUploadSaving] = useState(false)
@@ -230,7 +229,7 @@ export default function Facturas() {
     if (!uploadFilesState.length) { toast.warning('Selecciona al menos un XML o ZIP.'); return }
     setUploadPreviewLoading(true)
     try {
-      const response = await previewFacturasUpload(buildUploadFormData(), uploadApplyAi)
+      const response = await previewFacturasUpload(buildUploadFormData(), false)
       const payload = response.data || null
       setUploadPreview(payload)
 
@@ -266,7 +265,7 @@ export default function Facturas() {
       }
       const previewResponse = await previewPdfFacturas({
         facturas: extractedFacturas,
-        apply_ai: uploadApplyAi,
+        apply_ai: false,
         auto_apply_ai: false,
       })
       setPdfPreview({ extraction: extraction?.data, preview: previewResponse?.data })
@@ -288,7 +287,7 @@ export default function Facturas() {
     try {
       const response = await confirmarPdfFacturas({
         facturas: extractedFacturas,
-        apply_ai: uploadApplyAi,
+        apply_ai: false,
         auto_apply_ai: false,
       })
       const summary = response?.data?.summary || {}
@@ -310,7 +309,7 @@ export default function Facturas() {
     if (!uploadFilesState.length) { toast.warning('Selecciona al menos un XML o ZIP.'); return }
     setUploadSaving(true)
     try {
-      const response = await uploadFacturas(buildUploadFormData(), uploadApplyAi)
+      const response = await uploadFacturas(buildUploadFormData(), false)
       const s = response.data?.summary || {}
       const totalXml = Number(s.total_xml || 0)
       if (totalXml === 0) {
@@ -369,9 +368,7 @@ export default function Facturas() {
 
   const normalizePreviewSource = (source) => {
     if (source === 'config') return 'Configuración'
-    if (source === 'ai') return 'IA (umbral)'
-    if (source === 'ai_auto') return 'IA (auto-aplicada)'
-    if (source === 'ai_suggestion') return 'IA (sugerencia)'
+    if (source === 'historical') return 'Historial'
     if (source === 'none') return 'Sin sugerencia'
     return source || 'Sin sugerencia'
   }
@@ -718,7 +715,7 @@ export default function Facturas() {
                     cursor: 'pointer'
                   }}
                 >
-                  PDF (OCR + IA)
+                  PDF (texto + OCR)
                 </button>
               </div>
 
@@ -825,42 +822,6 @@ export default function Facturas() {
                 </div>
               )}
 
-              {/* OPCIONES */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                background: '#f8f9fc',
-                borderRadius: '8px',
-                border: '1px solid #e3e6f0'
-              }}>
-                <input
-                  type="checkbox"
-                  id="aplicarIA"
-                  checked={uploadApplyAi}
-                  onChange={(e) => setUploadApplyAi(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-                <label htmlFor="aplicarIA" style={{
-                  fontSize: '0.875rem', fontWeight: 600,
-                  color: '#5a5c69', cursor: 'pointer', margin: 0
-                }}>
-                  Aplicar IA para clasificación automática de cuentas
-                </label>
-                <span style={{
-                  marginLeft: 'auto',
-                  fontSize: '0.7rem',
-                  background: '#e8f4f8',
-                  color: '#36b9cc',
-                  padding: '2px 8px',
-                  borderRadius: '20px',
-                  fontWeight: 700
-                }}>
-                  RECOMENDADO
-                </span>
-              </div>
-
               {/* RESULTADO DE PREVISUALIZACIÓN */}
               {uploadMode !== 'pdf' && uploadPreview && (
                 <div style={{ marginTop: '20px' }}>
@@ -880,7 +841,7 @@ export default function Facturas() {
                           <th>Factura</th>
                           <th>Proveedor</th>
                           <th>Estado</th>
-                          <th>Resumen IA</th>
+                          <th>Mapeo contable</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -958,8 +919,7 @@ export default function Facturas() {
               {uploadMode === 'pdf' && pdfPreview && (
                 <div style={{ marginTop: '20px' }}>
                   <div className="text-sm fw-bold text-muted" style={{ marginBottom: '0.5rem' }}>
-                    PDF extraído — Confianza: {Math.round((pdfPreview.extraction?.confianza || 0) * 100)}% ·
-                    Páginas: {pdfPreview.extraction?.pages || 0}
+                    PDF extraído — Páginas: {pdfPreview.extraction?.pages || 0} · Revisión obligatoria
                   </div>
                   {(pdfPreview.extraction?.warnings || []).length > 0 && (
                     <div className="ui-alert" role="alert" style={{ marginBottom: '12px' }}>
@@ -974,7 +934,7 @@ export default function Facturas() {
                             <th>Factura</th>
                             <th>Proveedor</th>
                             <th>Estado</th>
-                            <th>Resumen IA</th>
+                            <th>Mapeo contable</th>
                           </tr>
                         </thead>
                         <tbody>

@@ -1,19 +1,17 @@
 services:
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
     environment:
-      - ENV=dev
       - TZ=America/Bogota
       - DATABASE_URL=postgresql://syncbank:syncbank@postgres:5432/syncbank
-      - AI_SERVICE_URL=http://ai-service:8001
     env_file:
-      - .env
+      - path: .env
+        required: false
     depends_on:
-      - ai-service
       - postgres
 
   postgres:
@@ -24,49 +22,12 @@ services:
       POSTGRES_PASSWORD: syncbank
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U syncbank -d syncbank"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    env_file:
-      - .env
-    environment:
-      - TZ=America/Bogota
-
-  ai-service:
-    build: ./ai-service
-    ports:
-      - "8001:8001"
-    volumes:
-      - ./ai-service:/app
-    env_file:
-      - .env
-    environment:
-      - TZ=America/Bogota
-      - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_TIMEOUT_SECONDS=60
-      - PDF_MAX_PAGES=5
-      - PDF_MAX_BYTES=15000000
-      - PDF_OCR_LANG=spa
-      - PDF_MAX_PROMPT_CHARS=8000
-      - PDF_RETRY_PROMPT_CHARS=4000
-
-  ollama:
-    image: ollama/ollama:latest
-    environment:
-      - TZ=America/Bogota
-    volumes:
-      - ollama_data:/root/.ollama
-
 volumes:
-  ollama_data:
   postgres_data:

@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field
 from services.factura_service import factura_service
 from services.pdf_extraction_service import PdfExtractionError, extraer_pdf_from_bytes
 from services.pdf_ingestion_service import pdf_ingestion_service
+from repositories.db_utils import run_in_executor
+from repositories.pending_document_repository import (
+    list_pending_documents,
+    resolve_pending_document,
+)
 
 router = APIRouter(prefix="/facturas", tags=["facturas"])
 
@@ -51,6 +56,26 @@ class PdfConfirmRequest(BaseModel):
     facturas: list[PdfFacturaPayload] = Field(default_factory=list)
     apply_ai: bool = True
     auto_apply_ai: bool = False
+
+
+@router.get("/pdf-pendientes")
+async def get_pdf_pendientes():
+    return {"data": await run_in_executor(list_pending_documents)}
+
+
+@router.post("/pdf-pendientes/{document_id}/confirmar")
+async def confirmar_pdf_pendiente(document_id: str, factura: PdfFacturaPayload):
+    result = await pdf_ingestion_service.process_factura_payload(
+        factura.model_dump(), persist=True, apply_ai=False, auto_apply_ai=False
+    )
+    if result.get("status") not in {"created", "duplicate"}:
+        raise HTTPException(
+            status_code=422, detail=result.get("reason") or "Factura invalida"
+        )
+    await run_in_executor(
+        lambda: resolve_pending_document(document_id, result.get("factura_id"))
+    )
+    return result
 
 
 @router.post("/preview-upload")

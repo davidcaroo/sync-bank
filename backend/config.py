@@ -20,11 +20,7 @@ class Settings(BaseSettings):
     DB_POOL_MAX_SIZE: int = 5
 
     ADMIN_API_KEY: str | None = None
-
-    OLLAMA_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2.5:3b"
-    AI_SERVICE_URL: str = "http://localhost:8001"
-    AI_CONFIDENCE_THRESHOLD: float = 0.65
+    ADMIN_USERNAME: str = "admin"
 
     METRICS_ENABLED: bool = True
     OTEL_ENABLED: bool = False

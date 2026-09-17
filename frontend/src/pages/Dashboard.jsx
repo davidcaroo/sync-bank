@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { KpiCard, StatusBadge } from '../components/DashboardBase';
 import {
   IconFileCheck as FileCheck,
@@ -19,8 +18,6 @@ import {
   triggerProcesoManual,
 } from '../lib/api';
 import { useToast } from '../components/ToastProvider';
-
-const REALTIME_ENABLED = import.meta.env.VITE_ENABLE_SUPABASE_REALTIME === 'true';
 
 export default function Dashboard() {
   const toast = useToast();
@@ -107,17 +104,6 @@ export default function Dashboard() {
 
     load();
 
-    if (!REALTIME_ENABLED || !isSupabaseConfigured || !supabase) return undefined;
-
-    const channel = supabase
-      .channel('facturas-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'facturas' }, () => {
-        fetchStats();
-        fetchRecent();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
   }, []);
 
   return (

@@ -1,9 +1,12 @@
 import logging
 import json
+import base64
+import hmac
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from config import settings
@@ -27,6 +30,30 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Sync-bank API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_admin(request: Request, call_next):
+    if request.url.path == "/healthz" or not settings.ADMIN_API_KEY:
+        return await call_next(request)
+    authorization = request.headers.get("Authorization", "")
+    try:
+        scheme, encoded = authorization.split(" ", 1)
+        username, password = base64.b64decode(encoded).decode().split(":", 1)
+    except (ValueError, UnicodeDecodeError):
+        scheme, username, password = "", "", ""
+    valid = (
+        scheme.lower() == "basic"
+        and hmac.compare_digest(username, settings.ADMIN_USERNAME)
+        and hmac.compare_digest(password, settings.ADMIN_API_KEY)
+    )
+    if not valid:
+        return JSONResponse(
+            status_code=401,
+            content={"message": "Autenticacion requerida"},
+            headers={"WWW-Authenticate": 'Basic realm="Sync-bank"'},
+        )
+    return await call_next(request)
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -62,12 +89,6 @@ else:
 
 app.add_middleware(RequestTimingMiddleware)
 app.add_middleware(RequestIdMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.exception_handler(Exception)
@@ -101,6 +122,16 @@ def metrics():
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.get("/")
-def read_root():
+@app.get("/healthz")
+def healthcheck():
     return {"message": "Sync-bank API 🚀"}
+
+
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
+else:
+
+    @app.get("/")
+    def read_root():
+        return {"message": "Sync-bank API 🚀"}

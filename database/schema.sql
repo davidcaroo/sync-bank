@@ -102,3 +102,23 @@ create table if not exists public.logs_email (
 );
 create index if not exists logs_email_created_at_idx on public.logs_email (created_at desc);
 create index if not exists logs_email_estado_idx on public.logs_email (estado);
+
+create table if not exists public.documentos_pendientes (
+    id uuid primary key default gen_random_uuid(),
+    message_id text not null,
+    attachment_sha256 text not null,
+    file_name text not null,
+    page_start integer not null,
+    page_end integer not null,
+    raw_text text not null,
+    candidate jsonb not null,
+    missing_fields jsonb not null default '[]'::jsonb,
+    warnings jsonb not null default '[]'::jsonb,
+    estado text not null default 'requiere_revision',
+    factura_id uuid references public.facturas(id),
+    created_at timestamptz not null default now(),
+    resolved_at timestamptz,
+    unique (attachment_sha256, page_start, page_end)
+);
+create index if not exists documentos_pendientes_estado_idx
+on public.documentos_pendientes (estado, created_at desc);

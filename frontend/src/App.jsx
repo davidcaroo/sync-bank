@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { Sidebar, Topbar } from './components/DashboardBase'
 import Dashboard from './pages/Dashboard'
 import Facturas from './pages/Facturas'
@@ -7,31 +7,13 @@ import Logs from './pages/Logs'
 import Contactos from './pages/Contactos'
 import { useTheme } from './hooks/useTheme'
 import { ToastProvider } from './components/ToastProvider'
-import { getSupabaseUserName, supabase } from './lib/supabase'
 
 export default function App() {
   const [activeTab, setTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('syncbank-sidebar-collapsed') === 'true')
-  const [userName, setUserName] = useState('Auxiliar Contable')
+  const userName = 'Auxiliar Contable'
   const { theme, toggleTheme } = useTheme()
-
-  useEffect(() => {
-    let mounted = true
-
-    const loadUserName = async () => {
-      const resolvedName = await getSupabaseUserName()
-      if (mounted) {
-        setUserName(resolvedName)
-      }
-    }
-
-    loadUserName()
-
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => {
@@ -41,10 +23,7 @@ export default function App() {
     })
   }
 
-  const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut()
-    }
+  const handleLogout = () => {
     setTab('dashboard')
   }
 

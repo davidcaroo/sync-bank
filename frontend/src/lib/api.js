@@ -3,7 +3,7 @@ import axios from 'axios'
 const API_URL = import.meta.env.VITE_API_URL
 
 export const api = axios.create({
-  baseURL: API_URL ? `${API_URL}/api` : undefined,
+  baseURL: API_URL ? `${API_URL}/api` : '/api',
 })
 
 export const getFacturas = (params) => api.get('/facturas', { params })
@@ -39,4 +39,4 @@ export const deleteContacto = (id) => api.delete(`/contactos/${id}`)
 export const getProcesoStatus = () => api.get('/proceso/status')
 export const triggerProcesoManual = () => api.post('/proceso/manual')
 
-export const isApiConfigured = Boolean(API_URL)
+export const isApiConfigured = true
