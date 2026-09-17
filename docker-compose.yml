@@ -8,12 +8,27 @@ services:
     environment:
       - ENV=dev
       - TZ=America/Bogota
-      - SUPABASE_REQUIRE_SERVICE_KEY=false
+      - DATABASE_URL=postgresql://syncbank:syncbank@postgres:5432/syncbank
       - AI_SERVICE_URL=http://ai-service:8001
     env_file:
       - .env
     depends_on:
       - ai-service
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: syncbank
+      POSTGRES_USER: syncbank
+      POSTGRES_PASSWORD: syncbank
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncbank -d syncbank"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   frontend:
     build: ./frontend
@@ -54,3 +69,4 @@ services:
 
 volumes:
   ollama_data:
+  postgres_data:

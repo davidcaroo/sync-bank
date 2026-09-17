@@ -90,5 +90,15 @@ Aplica el esquema con `psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/
 
 Nunca guardes en Git `SOURCE_DATABASE_URL`, volcados con datos de producción ni contraseñas de base de datos.
 
+### Migración y corte a PostgreSQL
+
+1. Pausa la sincronización de correos y las escrituras de usuarios.
+2. Crea y verifica un respaldo final de Supabase.
+3. Aplica `database/schema.sql` y restaura los datos en un PostgreSQL vacío de Railway.
+4. Ejecuta `database/verify.sql` en origen y destino; filas, CUFE únicos y total deben coincidir.
+5. Configura `DATABASE_URL` con la URL privada de Railway y despliega el backend.
+6. Prueba facturas, estadísticas y logs antes de reanudar la sincronización.
+7. Para volver atrás, restaura las variables y el despliegue anterior. Nunca permitas escrituras simultáneas en ambas bases.
+
 ---
 Hecho con ❤️ por el equipo de Automatización.
