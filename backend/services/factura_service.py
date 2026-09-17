@@ -10,13 +10,11 @@ from fastapi import HTTPException
 from models.factura import FacturaDIAN, FacturaItem
 from observability.telemetry import get_tracer
 from repositories.factura_async_repository import SyncCausacionRepositoryAdapter, SyncFacturaRepositoryAdapter
-from repositories.job_repository import create_or_get_job, get_job as repo_get_job
 from repositories.db_utils import run_in_executor
 from services.factura_contracts import CausacionRepositoryPort, FacturaRepositoryPort
 from services.alegra_service import alegra_service, AlegraDuplicateBillError
 from services.errors import RemoteAPIError
 from services.ingestion_service import ingestion_service
-from services.job_dispatcher import enqueue_causar_factura
 from services.provider_mapping_service import provider_mapping_service
 from services.timezone_service import now_bogota, to_bogota
 from services.xml_parser import parse_xml_dian
@@ -42,49 +40,6 @@ class FacturaService:
         self._http_client_factory = http_client_factory or (
             lambda: httpx.AsyncClient(timeout=30.0, follow_redirects=True)
         )
-
-    async def enqueue_causar_factura(self, factura_id: str, overrides_map: dict | None = None) -> dict:
-        span_cm = tracer.start_as_current_span("factura.enqueue_causar_factura") if tracer else None
-        if span_cm:
-            span_cm.__enter__()
-        try:
-            factura_data = await self._factura_repository.get_factura_with_items(factura_id)
-            if not factura_data:
-                raise HTTPException(status_code=404, detail="Factura no encontrada")
-
-            job = await run_in_executor(
-                lambda: create_or_get_job(
-                    job_type="causar_factura",
-                    factura_id=factura_id,
-                    payload={"overrides_map": overrides_map or {}},
-                )
-            )
-
-            job_id = str(job.get("id"))
-            created = bool(job.get("created"))
-            if created:
-                enqueue_causar_factura(job_id=job_id, factura_id=factura_id, overrides_map=overrides_map or {})
-
-            logger.info(
-                "causar_factura_enqueued",
-                extra={"job_id": job_id, "factura_id": factura_id},
-            )
-            return {
-                "job_id": job_id,
-                "factura_id": factura_id,
-                "status": job.get("status") or "queued",
-                "created": created,
-                "message": "Job encolado" if created else "Ya existe un job activo para esta factura",
-            }
-        finally:
-            if span_cm:
-                span_cm.__exit__(None, None, None)
-
-    async def get_job_status(self, job_id: str) -> dict:
-        job = await run_in_executor(lambda: repo_get_job(job_id))
-        if not job:
-            raise HTTPException(status_code=404, detail="Job no encontrado")
-        return job
 
     async def _check_remote_bill_status(self, factura_data: dict, *, known_bill_id: str | None = None) -> dict:
         """Verify if the bill still exists in Alegra for this local invoice."""

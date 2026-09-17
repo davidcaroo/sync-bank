@@ -1,5 +1,4 @@
 import pytest
-from fastapi import HTTPException
 
 from services.factura_service import FacturaService
 from services.ingestion_service import XMLDocument
@@ -96,51 +95,3 @@ async def test_preview_upload_facturas_forwards_auto_apply_ai(monkeypatch):
     assert seen["auto_apply_ai"] is True
 
 
-class _FakeFacturaRepository:
-    async def get_factura_with_items(self, factura_id):
-        return {"id": factura_id}
-
-
-@pytest.mark.asyncio
-async def test_enqueue_causar_factura_creates_job(monkeypatch):
-    service = FacturaService(factura_repository=_FakeFacturaRepository())
-
-    async def fake_run_in_executor(action):
-        return action()
-
-    monkeypatch.setattr("services.factura_service.run_in_executor", fake_run_in_executor)
-    monkeypatch.setattr(
-        "services.factura_service.create_or_get_job",
-        lambda **kwargs: {"id": "job-1", "status": "queued", "created": True},
-    )
-
-    dispatched = {}
-
-    def fake_enqueue_causar_factura(*, job_id, factura_id, overrides_map=None):
-        dispatched["job_id"] = job_id
-        dispatched["factura_id"] = factura_id
-        dispatched["overrides_map"] = overrides_map or {}
-
-    monkeypatch.setattr("services.factura_service.enqueue_causar_factura", fake_enqueue_causar_factura)
-
-    result = await service.enqueue_causar_factura("factura-1", {"item": {"cuenta_contable_alegra": "5001"}})
-
-    assert result["job_id"] == "job-1"
-    assert result["created"] is True
-    assert dispatched["factura_id"] == "factura-1"
-
-
-@pytest.mark.asyncio
-async def test_get_job_status_404(monkeypatch):
-    service = FacturaService(factura_repository=_FakeFacturaRepository())
-
-    async def fake_run_in_executor(action):
-        return action()
-
-    monkeypatch.setattr("services.factura_service.run_in_executor", fake_run_in_executor)
-    monkeypatch.setattr("services.factura_service.repo_get_job", lambda _job_id: None)
-
-    with pytest.raises(HTTPException) as exc:
-        await service.get_job_status("missing")
-
-    assert exc.value.status_code == 404

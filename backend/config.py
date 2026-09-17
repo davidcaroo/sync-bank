@@ -30,9 +30,6 @@ class Settings(BaseSettings):
     AI_SERVICE_URL: str = "http://localhost:8001"
     AI_CONFIDENCE_THRESHOLD: float = 0.65
 
-    REDIS_URL: str = "redis://redis:6379/0"
-    JOB_QUEUE_NAME: str = "syncbank.jobs"
-
     METRICS_ENABLED: bool = True
     OTEL_ENABLED: bool = False
     OTEL_SERVICE_NAME: str = "sync-bank-backend"
