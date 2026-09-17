@@ -12,6 +12,7 @@ REQUIRED_ENV = {
     "SUPABASE_SERVICE_KEY": "test",
     "SUPABASE_REQUIRE_SERVICE_KEY": "true",
     "ADMIN_API_KEY": "test",
+    "DATABASE_URL": "postgresql://syncbank:syncbank@localhost:55432/syncbank",
 }
 
 for key, value in REQUIRED_ENV.items():

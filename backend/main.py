@@ -1,5 +1,6 @@
 import logging
 import json
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +12,21 @@ from routers import facturas, proceso, config, logs, contactos, providers
 from scheduler import start_scheduler
 from middleware.metrics import RequestTimingMiddleware
 from middleware.request_id import RequestIdMiddleware
+from repositories.database import close_pool, open_pool
 
-app = FastAPI(title="Sync-bank API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    open_pool()
+    init_telemetry()
+    start_scheduler()
+    try:
+        yield
+    finally:
+        close_pool()
+
+
+app = FastAPI(title="Sync-bank API", lifespan=lifespan)
 
 
 class JsonLogFormatter(logging.Formatter):
@@ -75,12 +89,6 @@ app.include_router(config.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(contactos.router, prefix="/api")
 app.include_router(providers.router, prefix="/api")
-
-@app.on_event("startup")
-async def startup_event():
-    init_telemetry()
-    start_scheduler()
-
 
 @app.get("/metrics")
 def metrics():

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str | None = None
     SUPABASE_REQUIRE_SERVICE_KEY: bool = True
 
+    DATABASE_URL: str
+    DB_POOL_MIN_SIZE: int = 1
+    DB_POOL_MAX_SIZE: int = 5
+
     ADMIN_API_KEY: str | None = None
     
     OLLAMA_URL: str = "http://localhost:11434"
