@@ -4,7 +4,6 @@ import {
   IconFilter as SlidersHorizontal,
   IconX as X,
   IconHistory as History,
-  IconLoading,
   IconInbox,
   IconChevronLeft,
   IconChevronRight
@@ -47,11 +46,12 @@ export default function Logs() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [page, estado])
   useEffect(() => { setPage(1)  }, [estado])
 
   return (
-    <div>
+    <div className="page-shell">
       {/* ── Page heading ──────────────────────────────────────── */}
       <div className="page-heading">
         <div>
@@ -117,18 +117,14 @@ export default function Logs() {
             </thead>
             <tbody>
               {loading && (
-                <tr>
-                  <td colSpan={4}>
-                    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#b7b9cc' }}>
-                      <IconLoading size={48} color="#b7b9cc" style={{
-                        animation: 'spin 1s linear infinite'
-                      }}/>
-                      <p style={{ marginTop: '16px', color: '#858796', fontSize: '0.9rem', fontWeight: 600 }}>
-                        Cargando registros...
-                      </p>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={`loading-${index}`} aria-hidden="true">
+                    <td><span className="skeleton skeleton-line" /></td>
+                    <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                    <td><span className="skeleton skeleton-chip" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                  </tr>
+                ))
               )}
 
               {!loading && data.map((row) => (

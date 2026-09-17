@@ -12,9 +12,7 @@ import {
   IconChevronRight as PanelLeftOpen,
   IconChevronRight as ChevronDown,
   IconMoonStar as MoonStar,
-  IconLogOut as LogOut,
-  IconX,
-  IconLoading
+  IconLogOut as LogOut
 } from './icons/Icons';
 
 import logoIcon from '../assets/icono-blanco.png';
@@ -64,8 +62,8 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse
                 style={{ width: '32px', height: '32px', objectFit: 'contain', flexShrink: 0 }} 
               />
               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <h1 className="sidebar-brand-title" style={{ margin: 0, fontSize: '1.25rem' }}>Sync-bank</h1>
-                <p className="sidebar-brand-subtitle" style={{ margin: 0, opacity: 0.8 }}>Automation Finance Suite</p>
+                <h1 className="sidebar-brand-title">SyncBank</h1>
+                <p className="sidebar-brand-subtitle">Operación financiera</p>
               </div>
             </div>
           )}
@@ -111,6 +109,7 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse
    ================================================================ */
 export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLogout }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
 
   const tabLabel = {
     dashboard:     'Dashboard Ejecutivo',
@@ -146,19 +145,36 @@ export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLo
           <Menu size={18} />
         </button>
 
-        <div className="hidden lg:block topbar-divider" />
-
         <div>
-          <p className="topbar-page-label">Panel</p>
           <h2 className="topbar-page-title">{tabLabel[activeTab]}</h2>
+          <p className="topbar-page-context">Gestión y seguimiento en tiempo real</p>
         </div>
       </div>
 
       {/* Right – actions + user */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <button className="icon-btn" type="button" aria-label="Notificaciones">
-          <BellRing size={16} />
-        </button>
+        <div className="notification-menu">
+          <button
+            className="icon-btn"
+            type="button"
+            aria-label="Notificaciones"
+            aria-expanded={notificationsOpen}
+            onClick={() => setNotificationsOpen((value) => !value)}
+          >
+            <BellRing size={17} />
+          </button>
+          <div className={`notification-popover${notificationsOpen ? ' show' : ''}`}>
+            <div className="notification-popover-head">
+              <strong>Notificaciones</strong>
+              <span>0 pendientes</span>
+            </div>
+            <div className="notification-empty">
+              <BellRing size={22} />
+              <p>Todo está al día</p>
+              <span>Las novedades de sincronización aparecerán aquí.</span>
+            </div>
+          </div>
+        </div>
 
         <button
           className="icon-btn"
@@ -228,17 +244,20 @@ const kpiVariants = {
   'brand':      { mod: 'kpi-primary', },
 };
 
-export const KpiCard = ({ label, value, icon: Icon, color = 'brand' }) => {
+export const KpiCard = ({ label, value, icon, color = 'brand', loading = false }) => {
   const variant = kpiVariants[color] || kpiVariants.brand;
+  const KpiIcon = icon;
 
   return (
     <article className={`kpi-card ${variant.mod}`}>
       <div className="kpi-body">
         <p className="kpi-label">{label}</p>
-        <p className="kpi-value">{value}</p>
+        <p className="kpi-value">
+          {loading ? <span className="skeleton skeleton-number" aria-label="Cargando" /> : value}
+        </p>
       </div>
       <div className="kpi-icon-wrap" aria-hidden="true">
-        <Icon size={38} strokeWidth={1.4} />
+        <KpiIcon size={38} strokeWidth={1.4} />
       </div>
     </article>
   );

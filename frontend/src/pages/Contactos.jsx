@@ -15,7 +15,6 @@ import {
   IconChevronRight
 } from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { StatusBadge } from '../components/DashboardBase'
 import {
   createContacto,
   deleteContacto,
@@ -133,7 +132,7 @@ export default function Contactos() {
 
       setRows(data)
       setHasMore(Boolean(response.data?.has_more))
-    } catch (err) {
+    } catch {
       setError('No se pudo cargar el listado de contactos.')
       toast.error('No fue posible obtener contactos de Alegra.')
     } finally {
@@ -143,6 +142,8 @@ export default function Contactos() {
 
   useEffect(() => {
     fetchData(page)
+    // ponytail: the page loader intentionally owns this dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo, estadoFilter, page])
 
   const clearFilters = () => {
@@ -252,7 +253,7 @@ export default function Contactos() {
       await updateContacto(row.id, { ...row, status: nextStatus })
       await fetchData(page)
       toast.success(`Contacto ${nextStatus === 'active' ? 'activado' : 'desactivado'}.`)
-    } catch (err) {
+    } catch {
       toast.error('No se pudo cambiar el estado del contacto.')
     } finally {
       setLoading(false)
@@ -262,7 +263,7 @@ export default function Contactos() {
   const selectedType = (form.contact_type || []).includes('client') ? 'client' : 'provider'
 
   return (
-    <div>
+    <div className="page-shell">
       {/* ── Page heading ──────────────────────────────────────────── */}
       <div className="page-heading">
         <div>
@@ -497,9 +498,16 @@ export default function Contactos() {
             </thead>
             <tbody>
               {loading && (
-                <tr>
-                  <td colSpan={6}><div className="table-empty">Cargando contactos...</div></td>
-                </tr>
+                Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={`loading-${index}`} aria-hidden="true">
+                    <td><span className="skeleton skeleton-line" /></td>
+                    <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-chip" /></td>
+                    <td><span className="skeleton skeleton-chip" /></td>
+                    <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                  </tr>
+                ))
               )}
               {!loading && rows.map((row) => (
                 <tr key={row.id}>

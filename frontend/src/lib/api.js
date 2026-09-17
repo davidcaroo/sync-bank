@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { FACTURAS_COLLECTION } from './endpoints'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -6,7 +7,7 @@ export const api = axios.create({
   baseURL: API_URL ? `${API_URL}/api` : '/api',
 })
 
-export const getFacturas = (params) => api.get('/facturas', { params })
+export const getFacturas = (params) => api.get(FACTURAS_COLLECTION, { params })
 export const getFacturaById = (id) => api.get(`/facturas/${id}`)
 export const causarFactura = (id, payload) => api.post(`/facturas/${id}/causar`, payload)
 export const getFacturasStats = () => api.get('/facturas/stats')

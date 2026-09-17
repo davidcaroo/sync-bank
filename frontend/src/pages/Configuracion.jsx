@@ -6,7 +6,6 @@ import {
   IconSave as Save,
   IconTrash as Trash2,
   IconRefresh,
-  IconLoading,
   IconEdit,
   IconX,
   IconSearch
@@ -73,6 +72,7 @@ export default function Configuracion() {
     } finally { setCatalogLoading(false) }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); fetchCatalogo() }, [])
 
   /* ── form handlers ─────────────────────────────────────── */
@@ -143,7 +143,7 @@ export default function Configuracion() {
 
   /* ── render ─────────────────────────────────────────────── */
   return (
-    <div>
+    <div className="page-shell">
       {/* ── Page heading ─────────────────────────────────── */}
       <div className="page-heading">
         <div>
@@ -400,18 +400,16 @@ export default function Configuracion() {
             </thead>
             <tbody>
               {loading && (
-                <tr>
-                  <td colSpan={6}>
-                    <div style={{ textAlign: 'center', padding: '48px 24px', color: '#b7b9cc' }}>
-                      <IconLoading size={48} color="#b7b9cc" style={{
-                        animation: 'spin 1s linear infinite'
-                      }}/>
-                      <p style={{ marginTop: '16px', color: '#858796', fontSize: '0.9rem', fontWeight: 600 }}>
-                        Cargando mapeos...
-                      </p>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, index) => (
+                  <tr key={`loading-${index}`} aria-hidden="true">
+                    <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                    <td><span className="skeleton skeleton-line" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                    <td><span className="skeleton skeleton-chip" /></td>
+                    <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                  </tr>
+                ))
               )}
               {!loading && data.map((row) => (
                 <tr key={row.id}>

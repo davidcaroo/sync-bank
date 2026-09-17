@@ -23,8 +23,9 @@ export default function App() {
     })
   }
 
-  const handleLogout = () => {
-    setTab('dashboard')
+  const handleLogout = async () => {
+    await fetch('/logout', { method: 'POST' })
+    window.location.assign('/login')
   }
 
   return (
@@ -49,7 +50,7 @@ export default function App() {
             onLogout={handleLogout}
           />
 
-          <main className="app-content">
+          <main className="app-content" id="main-content">
             {activeTab === 'dashboard' && <Dashboard />}
             {activeTab === 'facturas' && <Facturas />}
             {activeTab === 'contactos' && <Contactos />}

@@ -7,8 +7,7 @@ import {
   IconInbox as Inbox,
   IconRefresh as RefreshCw,
   IconFileText as ListOrdered,
-  IconArchive,
-  IconLoading
+  IconArchive
 } from '../components/icons/Icons';
 import {
   getFacturas,
@@ -23,6 +22,7 @@ export default function Dashboard() {
   const toast = useToast();
   const [stats, setStats] = useState({ hoy: 0, causadas: 0, pendientes: 0, errores: 0 });
   const [recent, setRecent] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [lastSyncSummary, setLastSyncSummary] = useState(null);
@@ -93,27 +93,29 @@ export default function Dashboard() {
     const load = async () => {
       try {
         setError(null);
-        await fetchStats();
-        await fetchRecent();
-        await fetchStatus();
+        await Promise.all([fetchStats(), fetchRecent(), fetchStatus()]);
       } catch {
         setError('No se pudo cargar el dashboard.');
         toast.error('No se pudo cargar el panel principal.');
+      } finally {
+        setInitialLoading(false);
       }
     };
 
     load();
 
+    // ponytail: initial dashboard load is intentionally mount-only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div>
+    <div className="page-shell dashboard-page">
       {/* ── Page heading ───────────────────────────────── */}
       <div className="page-heading">
         <div>
-          <h1 className="page-heading-title">Resumen General</h1>
+          <h1 className="page-heading-title">Resumen general</h1>
           <p className="page-heading-sub">
-            Monitoreo de causación en tiempo real
+            Visibilidad inmediata sobre recepción, revisión y causación.
             {lastSync && (
               <span className="text-muted" style={{ marginLeft: '0.5rem' }}>
                 · Última sincronización: {new Date(lastSync).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
@@ -132,30 +134,24 @@ export default function Dashboard() {
             size={16} 
             style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} 
           />
-          {loading ? 'Procesando…' : 'Sincronizar Emails'}
+          {loading ? 'Sincronizando…' : 'Sincronizar correos'}
         </button>
       </div>
 
       {/* ── Error alert ────────────────────────────────── */}
       {error && (
         <div className="ui-alert" role="alert">
-          {error}
+          <div><strong>No pudimos actualizar el panel.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => window.location.reload()}>Reintentar</button>
         </div>
       )}
 
       {/* ── KPI Cards – 4 col grid ─────────────────────── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <KpiCard label="Facturas Hoy"  value={stats.hoy}       icon={Inbox}        color="blue-500"   />
-        <KpiCard label="Causadas"       value={stats.causadas}  icon={FileCheck}    color="green-500"  />
-        <KpiCard label="Pendientes"     value={stats.pendientes} icon={Clock}       color="yellow-500" />
-        <KpiCard label="Errores"        value={stats.errores}   icon={AlertCircle}  color="red-500"    />
+      <div className="dashboard-kpi-grid">
+        <KpiCard label="Recibidas hoy"  value={stats.hoy}       icon={Inbox}        color="blue-500" loading={initialLoading} />
+        <KpiCard label="Causadas"       value={stats.causadas}  icon={FileCheck}    color="green-500" loading={initialLoading} />
+        <KpiCard label="Por revisar"    value={stats.pendientes} icon={Clock}       color="yellow-500" loading={initialLoading} />
+        <KpiCard label="Con error"      value={stats.errores}   icon={AlertCircle}  color="red-500" loading={initialLoading} />
       </div>
 
       {/* ── Resultado última sincronización ─────────────────── */}
@@ -216,7 +212,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Últimas Facturas card ──────────────────────── */}
-      <div className="sb-card">
+      <div className="sb-card activity-card">
         {/* Card header */}
         <div className="sb-card-header">
           <h2
@@ -224,7 +220,7 @@ export default function Dashboard() {
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
           >
             <ListOrdered size={16} />
-            Últimas Facturas
+            Facturas recientes
           </h2>
           <span className="text-muted text-sm">Actividad reciente</span>
         </div>
@@ -243,7 +239,17 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((f) => (
+              {initialLoading && Array.from({ length: 5 }).map((_, index) => (
+                <tr key={`skeleton-${index}`} aria-hidden="true">
+                  <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                  <td><span className="skeleton skeleton-line" /></td>
+                  <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                  <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                  <td><span className="skeleton skeleton-chip" /></td>
+                  <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                </tr>
+              ))}
+              {!initialLoading && recent.map((f) => (
                 <tr key={f.id} className="text-sm">
                   <td className="fw-bold">{f.numero_factura}</td>
                   <td>{f.nombre_proveedor}</td>
@@ -259,7 +265,7 @@ export default function Dashboard() {
                 </tr>
               ))}
 
-              {recent.length === 0 && (
+              {!initialLoading && recent.length === 0 && (
                 <tr>
                   <td colSpan={6}>
                     <div className="table-empty">
