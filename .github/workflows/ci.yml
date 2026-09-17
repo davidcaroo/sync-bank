@@ -7,6 +7,20 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: syncbank
+          POSTGRES_USER: syncbank
+          POSTGRES_PASSWORD: syncbank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U syncbank -d syncbank"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -35,10 +49,7 @@ jobs:
           IMAP_PASS: test
           ALEGRA_EMAIL: test
           ALEGRA_TOKEN: test
-          SUPABASE_URL: http://localhost
-          SUPABASE_KEY: test
-          SUPABASE_SERVICE_KEY: test
-          SUPABASE_REQUIRE_SERVICE_KEY: "true"
+          DATABASE_URL: postgresql://syncbank:syncbank@localhost:5432/syncbank
           ADMIN_API_KEY: test
         run: pytest -q
 

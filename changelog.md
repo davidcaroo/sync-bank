@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-09-17] - Migración del backend a PostgreSQL directo
+
+- Se reemplazó el acceso de servidor mediante Supabase por `psycopg` con pool de conexiones.
+- La factura y sus ítems se guardan en una sola transacción, con idempotencia por CUFE en PostgreSQL.
+- Se añadieron un esquema portable, consultas de paridad y pruebas de integración con PostgreSQL 16.
+- Se eliminaron el cliente Supabase del backend y la pila sin uso de Redis, Dramatiq y workers.
+- El corte compara filas, CUFE únicos y total de facturas antes de cambiar `DATABASE_URL`.
+- El rollback restaura el despliegue anterior; no se permiten escrituras simultáneas en ambas bases.
+- La autenticación Supabase del frontend se mantiene temporalmente para el plan de consolidación.
+
 ## [2026-04-14] - Fix: Causación con IVA en Alegra
 ### Corregido
 - Se eliminó el impuesto fijo `tax: [{"id": 1}]` en `backend/services/alegra_client.py` al crear bills.
