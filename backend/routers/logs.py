@@ -10,10 +10,12 @@ async def list_logs(
     page_size: int = Query(20, ge=1, le=200),
     estado: str | None = None,
 ):
-    res = await run_in_executor(lambda: list_logs_paginated(page=page, page_size=page_size, estado=estado))
+    rows, total = await run_in_executor(
+        lambda: list_logs_paginated(page=page, page_size=page_size, estado=estado)
+    )
     return {
-        "data": res.data or [],
-        "count": res.count or 0,
+        "data": rows,
+        "count": total,
         "page": page,
         "page_size": page_size,
     }

@@ -2,7 +2,7 @@ import imaplib
 import email
 from email.header import decode_header
 from config import settings
-from services.supabase_service import log_email
+from repositories.logs_repository import upsert_email_log
 from repositories.db_utils import run_in_executor
 from services.ingestion_service import ingestion_service
 
@@ -148,7 +148,7 @@ async def check_emails(search_criteria: str = 'UNSEEN'):
                 email_log["estado"] = "error" if has_errors else "ignorado"
 
             try:
-                await run_in_executor(lambda: log_email(email_log))
+                await run_in_executor(lambda: upsert_email_log(email_log))
             except Exception as db_err:
                 print(f"Error guardando log de email: {db_err}")
                 summary["errors"] += 1
