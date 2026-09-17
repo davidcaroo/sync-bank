@@ -277,8 +277,6 @@ export default function Contactos() {
         </button>
       </div>
 
-      {error && <div className="ui-alert" role="alert">{error}</div>}
-
       {/* ── KPI Cards ─────────────────────────────────────────────── */}
       <div className="dashboard-kpi-grid kpi-grid-3">
         <KpiCard label="Total visibles" value={kpis.total} icon={Users} color="blue-500" loading={loading && rows.length === 0} />

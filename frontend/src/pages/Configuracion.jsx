@@ -164,8 +164,6 @@ export default function Configuracion() {
         </button>
       </div>
 
-      {error && <div className="ui-alert" role="alert">{error}</div>}
-
       {/* ── Form card ────────────────────────────────────── */}
       <div className="sb-card" ref={formCardRef}>
         <div className="sb-card-header">

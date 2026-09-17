@@ -138,14 +138,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* ── Error alert ────────────────────────────────── */}
-      {error && (
-        <div className="ui-alert" role="alert">
-          <div><strong>No pudimos actualizar el panel.</strong><span>{error}</span></div>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => window.location.reload()}>Reintentar</button>
-        </div>
-      )}
-
       {/* ── KPI Cards – 4 col grid ─────────────────────── */}
       <div className="dashboard-kpi-grid">
         <KpiCard label="Recibidas hoy"  value={stats.hoy}       icon={Inbox}        color="blue-500" loading={initialLoading} />

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { FACTURAS_COLLECTION } from './endpoints'
+import { FACTURAS_COLLECTION, CONTACTOS_COLLECTION, CONFIG_COLLECTION, LOGS_COLLECTION } from './endpoints'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -23,17 +23,17 @@ export const extraerPdf = (formData, preview = true) => api.post(`/facturas/extr
 export const previewPdfFacturas = (payload) => api.post('/facturas/preview-pdf', payload)
 export const confirmarPdfFacturas = (payload) => api.post('/facturas/confirmar-pdf', payload)
 
-export const getConfigCuentas = (params) => api.get('/config', { params })
+export const getConfigCuentas = (params) => api.get(CONFIG_COLLECTION, { params })
 export const getAlegraCatalogo = (params) => api.get('/config/alegra/catalogo', { params })
-export const createConfigCuenta = (payload) => api.post('/config', payload)
+export const createConfigCuenta = (payload) => api.post(CONFIG_COLLECTION, payload)
 export const updateConfigCuenta = (id, payload) => api.patch(`/config/${id}`, payload)
 export const deleteConfigCuenta = (id) => api.delete(`/config/${id}`)
 
-export const getLogs = (params) => api.get('/logs', { params })
+export const getLogs = (params) => api.get(LOGS_COLLECTION, { params })
 
-export const getContactos = (params) => api.get('/contactos', { params })
+export const getContactos = (params) => api.get(CONTACTOS_COLLECTION, { params })
 export const getContactoById = (id) => api.get(`/contactos/${id}`)
-export const createContacto = (payload) => api.post('/contactos', payload)
+export const createContacto = (payload) => api.post(CONTACTOS_COLLECTION, payload)
 export const updateContacto = (id, payload) => api.patch(`/contactos/${id}`, payload)
 export const deleteContacto = (id) => api.delete(`/contactos/${id}`)
 

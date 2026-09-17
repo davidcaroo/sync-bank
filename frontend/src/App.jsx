@@ -23,6 +23,14 @@ export default function App() {
     })
   }
 
+  const toggleSidebar = () => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen((prev) => !prev)
+    } else {
+      toggleSidebarCollapsed()
+    }
+  }
+
   const handleLogout = async () => {
     await fetch('/logout', { method: 'POST' })
     window.location.assign('/login')
@@ -36,14 +44,13 @@ export default function App() {
           setTab={setTab}
           isOpen={sidebarOpen}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebarCollapsed}
           onClose={() => setSidebarOpen(false)}
         />
 
         <div className="app-main">
           <Topbar
             activeTab={activeTab}
-            onMenu={() => setSidebarOpen(true)}
+            onMenu={toggleSidebar}
             theme={theme}
             onToggleTheme={toggleTheme}
             userName={userName}

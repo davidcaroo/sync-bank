@@ -410,8 +410,6 @@ export default function Facturas() {
         </button>
       </div>
 
-      {error && <div className="ui-alert" role="alert">{error}</div>}
-
       {/* ── Filtros ───────────────────────────────────────────────── */}
       <div className="sb-card">
         <div className="sb-card-header">

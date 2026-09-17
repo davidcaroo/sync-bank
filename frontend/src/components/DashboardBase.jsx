@@ -8,8 +8,6 @@ import {
   IconMenu as Menu,
   IconRefresh as Sun,
   IconBell as BellRing,
-  IconChevronLeft as PanelLeftClose,
-  IconChevronRight as PanelLeftOpen,
   IconChevronRight as ChevronDown,
   IconMoonStar as MoonStar,
   IconLogOut as LogOut
@@ -22,7 +20,7 @@ const icons = { LayoutDashboard, FileText, Settings, History, Users };
 /* ================================================================
    SIDEBAR
    ================================================================ */
-export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse, onClose }) => {
+export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onClose }) => {
   const menuItems = [
     { id: 'dashboard',     label: 'Dashboard',  icon: 'LayoutDashboard' },
     { id: 'facturas',      label: 'Facturas',   icon: 'FileText' },
@@ -87,18 +85,6 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse
             );
           })}
         </nav>
-
-        {/* Collapse toggle – desktop only */}
-        <div className="hidden lg:block">
-          <button
-            className="sidebar-toggle-btn"
-            onClick={onToggleCollapse}
-            title={collapsed ? 'Expandir sidebar' : 'Contraer sidebar'}
-          >
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-            <span className="sidebar-label">{collapsed ? 'Expandir' : 'Contraer'}</span>
-          </button>
-        </div>
       </aside>
     </>
   );
@@ -110,6 +96,18 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onToggleCollapse
 export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLogout }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const userMenuRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   const tabLabel = {
     dashboard:     'Dashboard Ejecutivo',
@@ -137,10 +135,9 @@ export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLo
       {/* Left – hamburger + page title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <button
-          className="icon-btn lg:hidden"
+          className="icon-btn"
           onClick={onMenu}
-          aria-label="Abrir menú lateral"
-          style={{ display: 'flex' }}
+          aria-label="Contraer o expandir menú lateral"
         >
           <Menu size={18} />
         </button>
@@ -188,11 +185,7 @@ export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLo
         <div className="topbar-divider" />
 
         {/* User dropdown */}
-        <div
-          className="user-menu"
-          onMouseEnter={() => setMenuOpen(true)}
-          onMouseLeave={() => setMenuOpen(false)}
-        >
+        <div className="user-menu" ref={userMenuRef}>
           <button
             type="button"
             className="user-chip user-chip-btn"

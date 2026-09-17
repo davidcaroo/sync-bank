@@ -64,8 +64,6 @@ export default function Logs() {
         </div>
       </div>
 
-      {error && <div className="ui-alert" role="alert">{error}</div>}
-
       {/* ── Filtros ───────────────────────────────────────────── */}
       <div className="audit-toolbar">
         <div className="audit-toolbar-title">
