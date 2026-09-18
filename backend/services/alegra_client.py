@@ -420,6 +420,38 @@ class AlegraClient:
             raise RemoteAPIError(f"Error Alegra API al listar contactos: {res.text}")
         return _extract_contacts(res.json())
 
+    async def list_contacts_with_total(
+        self,
+        client: httpx.AsyncClient,
+        contact_type: str | None = "provider",
+        start: int = 0,
+        limit: int = 30,
+    ) -> dict:
+        params = {"metadata": "true"}
+        if contact_type:
+            params["type"] = contact_type
+        params["start"] = max(0, int(start))
+        params["limit"] = max(1, min(int(limit), 30))
+
+        res = await client.get(
+            f"{self.base_url}/contacts", params=params, headers=self.headers
+        )
+        if res.status_code != 200:
+            raise RemoteAPIError(f"Error Alegra API al listar contactos: {res.text}")
+
+        payload = res.json()
+        contacts = _extract_contacts(payload)
+        total = None
+        if isinstance(payload, dict):
+            metadata = payload.get("metadata")
+            if isinstance(metadata, dict) and metadata.get("total") is not None:
+                try:
+                    total = int(metadata.get("total"))
+                except (TypeError, ValueError):
+                    total = None
+
+        return {"data": contacts, "total": total}
+
     async def get_contact(self, client: httpx.AsyncClient, contact_id: str):
         res = await client.get(
             f"{self.base_url}/contacts/{contact_id}", headers=self.headers

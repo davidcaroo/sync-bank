@@ -123,12 +123,14 @@ async def list_contactos(
 
     try:
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
-            contacts = await alegra_service.list_contacts(
+            listing = await alegra_service.list_contacts_with_total(
                 client,
                 resolved_type,
                 start=start,
                 limit=page_size,
             )
+        contacts = listing.get("data") or []
+        total = listing.get("total")
     except Exception as exc:
         raise HTTPException(
             status_code=502,
@@ -188,6 +190,7 @@ async def list_contactos(
     return {
         "data": normalized,
         "count": len(normalized),
+        "total": total,
         "page": page,
         "page_size": page_size,
         "has_more": len(contacts) == page_size,

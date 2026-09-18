@@ -1352,6 +1352,32 @@ h1, h2, h3, h4, h5, h6 { font-family: 'Manrope', sans-serif; }
 .table-empty { padding: 4.5rem 1rem; }
 .table-empty-icon { color: var(--accent); }
 
+/* ============================================================
+   PAGINATION (numbered)
+   ============================================================ */
+.pagination { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.pagination-pages { display: flex; align-items: center; gap: .25rem; }
+.pagination-ellipsis { padding: 0 .2rem; color: var(--muted); font-size: .8rem; }
+.pagination-page {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 .4rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.pagination-page:hover { background: var(--panel-soft); border-color: var(--border); }
+.pagination-page.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+@media (max-width: 680px) {
+  .pagination-pages { order: 3; width: 100%; justify-content: center; }
+}
+
 .status-badge {
   min-height: 24px;
   padding: .28rem .58rem;

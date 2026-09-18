@@ -15,6 +15,7 @@ import {
   IconChevronRight
 } from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Pagination from '../components/Pagination'
 import { KpiCard } from '../components/DashboardBase'
 import {
   createContacto,
@@ -95,7 +96,10 @@ export default function Contactos() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
+  const [total, setTotal] = useState(null)
   const pageSize = 30
+  const filtersActive = estadoFilter !== 'all' || Boolean(query.trim()) || Boolean(phoneFilter.trim())
+  const totalPages = !filtersActive && typeof total === 'number' ? Math.max(1, Math.ceil(total / pageSize)) : null
 
   const kpis = useMemo(() => {
     const total = rows.length
@@ -133,6 +137,7 @@ export default function Contactos() {
 
       setRows(data)
       setHasMore(Boolean(response.data?.has_more))
+      setTotal(typeof response.data?.total === 'number' ? response.data.total : null)
     } catch {
       setError('No se pudo cargar el listado de contactos.')
       toast.error('No fue posible obtener contactos de Alegra.')
@@ -445,25 +450,33 @@ export default function Contactos() {
           </table>
         </div>
         <div className="table-footer">
-           <span className="text-sm text-muted">Mostrando {rows.length} resultados</span>
-           <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button 
-                className="btn-secondary btn-sm" 
-                disabled={page <= 1} 
-                onClick={() => setPage(prev => prev - 1)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <IconChevronLeft size={14} /> Anterior
-              </button>
-              <button 
-                className="btn-secondary btn-sm" 
-                disabled={!hasMore} 
-                onClick={() => setPage(prev => prev + 1)}
-                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                Siguiente <IconChevronRight size={14} />
-              </button>
-           </div>
+           <span className="text-sm text-muted">
+             {totalPages
+               ? <>Página <strong>{page}</strong> de <strong>{totalPages}</strong></>
+               : `Mostrando ${rows.length} resultados`}
+           </span>
+           {totalPages ? (
+             <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+           ) : (
+             <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn-secondary btn-sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage(prev => prev - 1)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <IconChevronLeft size={14} /> Anterior
+                </button>
+                <button
+                  className="btn-secondary btn-sm"
+                  disabled={!hasMore}
+                  onClick={() => setPage(prev => prev + 1)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  Siguiente <IconChevronRight size={14} />
+                </button>
+             </div>
+           )}
         </div>
       </div>
 

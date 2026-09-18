@@ -37,6 +37,17 @@ class AlegraService:
             identification=identification,
         )
 
+    async def list_contacts_with_total(
+        self,
+        client,
+        contact_type: str | None = "provider",
+        start: int = 0,
+        limit: int = 30,
+    ) -> dict:
+        return await self._client.list_contacts_with_total(
+            client, contact_type=contact_type, start=start, limit=limit
+        )
+
     async def get_contact(self, client, contact_id: str):
         return await self._client.get_contact(client, contact_id)
 
