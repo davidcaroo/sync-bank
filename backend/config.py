@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     IMAP_HOST: str = "imap.gmail.com"
     IMAP_PORT: int = 993
+    IMAP_MAILBOX: str = "inbox"
     IMAP_USER: str
     IMAP_PASS: str
 

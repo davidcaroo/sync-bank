@@ -1,7 +1,9 @@
+import base64
 import imaplib
 import email
 import hashlib
 import logging
+import re
 from email.header import decode_header
 from config import settings
 from repositories.logs_repository import upsert_email_log
@@ -13,6 +15,36 @@ from repositories.pending_document_repository import save_pending_document
 
 
 logger = logging.getLogger("email_service")
+
+
+def _imap_utf7(text: str) -> str:
+    """Encode a mailbox name as IMAP modified UTF-7 (RFC 3501)."""
+    out: list[str] = []
+    pending: list[str] = []
+
+    def flush() -> None:
+        if pending:
+            raw = base64.b64encode("".join(pending).encode("utf-16-be")).decode()
+            out.append("&" + raw.rstrip("=").replace("/", ",") + "-")
+            pending.clear()
+
+    for char in text:
+        if 0x20 <= ord(char) <= 0x7E:
+            flush()
+            out.append("&-" if char == "&" else char)
+        else:
+            pending.append(char)
+    flush()
+    return "".join(out)
+
+
+def _mailbox_arg(name: str) -> str:
+    """Mailbox name ready for SELECT: UTF-7 encoded and quoted when needed."""
+    encoded = _imap_utf7(name)
+    if re.fullmatch(r"[A-Za-z0-9._/\-]+", encoded):
+        return encoded
+    escaped = encoded.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 async def _try_auto_causacion(factura_id: str, summary: dict) -> None:
@@ -63,7 +95,29 @@ async def check_emails(search_criteria: str = "UNSEEN"):
 
         mail = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT)
         mail.login(settings.IMAP_USER, settings.IMAP_PASS)
-        mail.select("inbox")
+        mailbox = (settings.IMAP_MAILBOX or "").strip() or "inbox"
+        select_status, _ = mail.select(_mailbox_arg(mailbox))
+        if select_status != "OK":
+            summary["errors"] += 1
+            summary["invalid_details"].append(
+                {
+                    "source": "imap",
+                    "asunto": None,
+                    "remitente": None,
+                    "file_name": mailbox,
+                    "entry_name": None,
+                    "reason": (
+                        f"No se pudo abrir la carpeta o etiqueta '{mailbox}'. "
+                        "Verifica el nombre; en Gmail, la etiqueta debe estar "
+                        "visible en IMAP (Configuración > Etiquetas > Mostrar en IMAP)."
+                    ),
+                }
+            )
+            try:
+                mail.logout()
+            except Exception:
+                pass
+            return summary
 
         status, messages = mail.search(None, search_criteria)
         found_messages = len(messages[0].split())

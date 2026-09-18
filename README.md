@@ -26,6 +26,7 @@ No se usa IA ni un servicio de clasificación externo: la clasificación contabl
    - `DATABASE_URL` (PostgreSQL).
    - `ALEGRA_EMAIL` y `ALEGRA_TOKEN`.
    - `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER` e `IMAP_PASS` (buzón donde llegan las facturas).
+   - `IMAP_MAILBOX` (opcional, por defecto `inbox`): carpeta o etiqueta que se lee. Con Gmail, usa una etiqueta dedicada (por ejemplo `Facturas`, con "Mostrar en IMAP" activo) para no tocar el resto de tu correo. Ojo: "Sincronizar correos" revisa **todos** los mensajes de esa carpeta, no solo los no leídos.
    - `ADMIN_API_KEY` y `ADMIN_USERNAME` (acceso al panel).
 
 3. **Iniciar el sistema**:
