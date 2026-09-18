@@ -1,6 +1,6 @@
 # Provider Accounting Prefill Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Prefill one Alegra account and at most one cost center for every incoming invoice, while allowing explicitly authorized providers such as DEVISAB to be caused automatically from validated IMAP XML.
 
@@ -75,7 +75,7 @@
 - Modify: `backend/tests/integration/test_factura_repository_postgres.py`
 - Modify: `backend/tests/integration/test_config_logs_repositories_postgres.py`
 
-- [ ] **Step 1: Add a service test for an account-center pair**
+- [x] **Step 1: Add a service test for an account-center pair**
 
 Replace the account-only dummy result with mapping pairs and assert both fields:
 
@@ -96,7 +96,7 @@ async def test_provider_mapping_learns_account_and_cost_center_together():
     assert result["confidence"] == 0.75
 ```
 
-- [ ] **Step 2: Add an integration test that history excludes unconfirmed invoices**
+- [x] **Step 2: Add an integration test that history excludes unconfirmed invoices**
 
 Insert one `pendiente`, one failed causation, and three `procesado` invoices. Assert
 that only the three successful invoice mappings are returned and each invoice is
@@ -111,7 +111,7 @@ assert rows == [
 ]
 ```
 
-- [ ] **Step 3: Add an integration test protecting a manual rule**
+- [x] **Step 3: Add an integration test protecting a manual rule**
 
 ```python
 save_config_cuenta(
@@ -127,7 +127,7 @@ assert row["id_centro_costo_alegra"] == "12"
 assert row["source"] == "manual"
 ```
 
-- [ ] **Step 4: Run the focused tests and confirm failure**
+- [x] **Step 4: Run the focused tests and confirm failure**
 
 Run:
 
@@ -139,7 +139,7 @@ pytest -q tests/test_provider_mapping_service.py tests/integration/test_factura_
 Expected: FAIL because the extractor returns account-only counts, the repository
 does not filter confirmed history, and automatic upsert can replace manual rules.
 
-- [ ] **Step 5: Commit the failing tests**
+- [x] **Step 5: Commit the failing tests**
 
 ```powershell
 git add backend/tests/test_provider_mapping_service.py backend/tests/integration/test_factura_repository_postgres.py backend/tests/integration/test_config_logs_repositories_postgres.py
@@ -157,7 +157,7 @@ git commit -m "test: define provider accounting mapping behavior"
 - Modify: `backend/services/provider_mapping/evaluator.py`
 - Modify: `backend/tests/test_provider_mapping_service.py`
 
-- [ ] **Step 1: Add a repository query for confirmed mappings**
+- [x] **Step 1: Add a repository query for confirmed mappings**
 
 Add `list_confirmed_provider_mappings(nit_proveedor)` using parameterized SQL.
 The query must require an `exitoso` causation and aggregate item pairs by invoice:
@@ -185,7 +185,7 @@ order by f.created_at;
 Keep `list_factura_items_by_nit` only if another caller still uses it; otherwise
 delete it after `rg` confirms there are no references.
 
-- [ ] **Step 2: Count one consistent pair per invoice**
+- [x] **Step 2: Count one consistent pair per invoice**
 
 Implement the smallest strict rule in `HistoricalExtractor`:
 
@@ -202,7 +202,7 @@ if len(pairs) == 1:
 
 Mixed or empty invoices contribute no vote.
 
-- [ ] **Step 3: Generalize the evaluator without adding a second abstraction**
+- [x] **Step 3: Generalize the evaluator without adding a second abstraction**
 
 Keep `evaluate_account_choice` or rename it to `evaluate_mapping_choice`, but
 return the selected pair:
@@ -221,7 +221,7 @@ return {
 
 Retain `MIN_OCCURRENCES = 3` and `MIN_SHARE = 0.7`.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
@@ -232,7 +232,7 @@ pytest -q tests/test_provider_mapping_service.py tests/integration/test_factura_
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/repositories/factura_repository.py backend/services/provider_mapping backend/tests/test_provider_mapping_service.py backend/tests/integration/test_factura_repository_postgres.py
@@ -253,7 +253,7 @@ git commit -m "feat: learn accounting mappings from confirmed invoices"
 - Modify: `backend/tests/test_provider_mapping_service.py`
 - Modify: `backend/tests/integration/test_config_logs_repositories_postgres.py`
 
-- [ ] **Step 1: Add one shared NIT normalizer**
+- [x] **Step 1: Add one shared NIT normalizer**
 
 ```python
 import re
@@ -266,7 +266,7 @@ def normalize_nit(value: str | None) -> str:
 Use it at configuration lookup/save and provider-history lookup boundaries. Do not
 add a class or dependency.
 
-- [ ] **Step 2: Pass the center through the persistor and service result**
+- [x] **Step 2: Pass the center through the persistor and service result**
 
 Change the persistor contract to include:
 
@@ -286,7 +286,7 @@ async def save_mapping(
 Both `compute_and_save_mapping` and `suggest_mapping_from_history` must return
 `centro_costo` next to `cuenta`.
 
-- [ ] **Step 3: Protect manual configuration in PostgreSQL**
+- [x] **Step 3: Protect manual configuration in PostgreSQL**
 
 Before an automatic upsert, lock and inspect the current row in the same
 transaction. If its source is `manual`, return it unchanged:
@@ -303,13 +303,13 @@ if current and current.get("source") == "manual" and source != "manual":
 Only append to `config_cuentas_audit` when a value was actually created or
 changed.
 
-- [ ] **Step 4: Extend the Alegra fallback by bill, not by category line**
+- [x] **Step 4: Extend the Alegra fallback by bill, not by category line**
 
 For each historical Alegra bill, read its top-level `costCenter`, accept the bill
 only when all expense categories resolve to one account, and add one
 `(account, cost_center)` vote. Do not infer multiple centers.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -320,7 +320,7 @@ pytest -q tests/test_provider_mapping_service.py tests/test_alegra_extractor.py 
 
 Expected: PASS, including manual-rule protection.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/services/provider_mapping backend/services/provider_mapping_service.py backend/repositories/config_repository.py backend/tests
@@ -345,7 +345,7 @@ git commit -m "feat: persist account and cost center provider rules"
   Alegra category payload whose `observations` contains the XML description.
 - Modify: `backend/tests/test_pdf_ingestion_service.py`
 
-- [ ] **Step 1: Add failing XML and PDF tests**
+- [x] **Step 1: Add failing XML and PDF tests**
 
 For an active provider configuration:
 
@@ -370,12 +370,12 @@ assert item["confidence"] == 1.0
 Also test a historical suggestion with a center and an unmapped provider with
 both fields `None`.
 
-- [ ] **Step 2: Preserve the actual source value**
+- [x] **Step 2: Preserve the actual source value**
 
 When applying configuration, use `config["source"]` when present instead of
 always reporting `config`. Keep a safe fallback of `config` for older rows.
 
-- [ ] **Step 3: Apply historical account and center together**
+- [x] **Step 3: Apply historical account and center together**
 
 In both ingestors:
 
@@ -387,7 +387,7 @@ centro_to_save = historical_hint.get("centro_costo")
 Do not add different behavior for email: IMAP already enters through these
 ingestion services.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
@@ -398,7 +398,7 @@ pytest -q tests/test_ingestion_service.py tests/test_pdf_ingestion_service.py te
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/services/ingestion/processor.py backend/services/pdf_ingestion_service.py backend/tests/test_ingestion_service.py backend/tests/test_pdf_ingestion_service.py
@@ -417,7 +417,7 @@ git commit -m "feat: prefill account and cost center during ingestion"
 - Modify: `backend/tests/test_alegra_client.py`
 - Modify: `backend/tests/test_ingestion_service.py`
 
-- [ ] **Step 1: Add a sanitized peaje XML regression fixture in the test**
+- [x] **Step 1: Add a sanitized peaje XML regression fixture in the test**
 
 Use a minimal `AttachedDocument` containing an embedded invoice with issuer NIT
 `901209021`, CUFE, invoice `FEUU2183418`, one COP 13.900 line, no line tax nodes,
@@ -429,7 +429,7 @@ Paso por Peaje GAMBOTE por el valor de 13.900 con la placa SMN255, el dia 14-09-
 
 Do not commit the user's original XML or PDF.
 
-- [ ] **Step 2: Assert the parser does not invent IVA**
+- [x] **Step 2: Assert the parser does not invent IVA**
 
 ```python
 factura = parse_xml_dian(PEAJE_ATTACHED_DOCUMENT_XML)
@@ -443,7 +443,7 @@ assert factura.items[0].iva_porcentaje == 0
 assert factura.items[0].descripcion == PEAJE_DESCRIPTION
 ```
 
-- [ ] **Step 3: Run the parser test and verify failure**
+- [x] **Step 3: Run the parser test and verify failure**
 
 Run:
 
@@ -455,7 +455,7 @@ pytest -q tests/test_xml_parser.py -k peaje
 Expected: FAIL because `_extract_items` currently defaults a missing percentage
 to 19.
 
-- [ ] **Step 4: Change the missing percentage default to zero**
+- [x] **Step 4: Change the missing percentage default to zero**
 
 In `_extract_items`:
 
@@ -470,7 +470,7 @@ iva_porcentaje = _to_float(
 )
 ```
 
-- [ ] **Step 5: Add a ZIP regression test**
+- [x] **Step 5: Add a ZIP regression test**
 
 Build an in-memory ZIP containing the sanitized XML and a dummy PDF. Assert the
 extractor returns exactly the XML document, reports no error, and ignores the PDF.
@@ -483,7 +483,7 @@ assert [doc.entry_name for doc in result["documents"]] == [
 assert result["errors"] == []
 ```
 
-- [ ] **Step 6: Add the description to the Alegra category payload**
+- [x] **Step 6: Add the description to the Alegra category payload**
 
 ```python
 categoria = {
@@ -497,7 +497,7 @@ categoria = {
 Keep the existing general bill observations. Do not send a tax entry when
 `iva_porcentaje == 0`.
 
-- [ ] **Step 7: Verify the outbound payload**
+- [x] **Step 7: Verify the outbound payload**
 
 Add a mocked HTTP test asserting:
 
@@ -507,7 +507,7 @@ assert category["observations"] == PEAJE_DESCRIPTION
 assert "tax" not in category
 ```
 
-- [ ] **Step 8: Run focused tests**
+- [x] **Step 8: Run focused tests**
 
 Run:
 
@@ -518,7 +518,7 @@ pytest -q tests/test_xml_parser.py tests/test_alegra_client.py tests/test_ingest
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add backend/services/xml_parser.py backend/services/alegra_client.py backend/tests/test_xml_parser.py backend/tests/test_alegra_client.py backend/tests/test_ingestion_service.py
@@ -546,7 +546,7 @@ git commit -m "fix: preserve peaje tax and description from XML"
 - Produces: `evaluate_auto_causacion(factura, config) -> AutoCausacionDecision`
   and `AutoCausacionService.try_cause_from_imap_xml(factura_id) -> dict`.
 
-- [ ] **Step 1: Add the opt-in flag to the canonical schema**
+- [x] **Step 1: Add the opt-in flag to the canonical schema**
 
 ```sql
 alter table public.config_cuentas
@@ -559,7 +559,7 @@ alter table public.config_cuentas_audit
 Include the column in fresh `create table` definitions and repository allowlists.
 Automatic mappings always save `auto_causar = false`.
 
-- [ ] **Step 2: Define the eligibility result and pure guard**
+- [x] **Step 2: Define the eligibility result and pure guard**
 
 In `auto_causacion_service.py`:
 
@@ -579,7 +579,7 @@ normalized issuer NIT, has account and center, and the invoice has real CUFE,
 number, COP currency, positive total, non-empty items, consistent line/subtotal
 and invoice totals within COP 0.01.
 
-- [ ] **Step 3: Write table-driven failing guard tests**
+- [x] **Step 3: Write table-driven failing guard tests**
 
 Cover each denial independently:
 
@@ -600,7 +600,7 @@ def test_auto_causacion_rejects_invalid_invoice(change, reason):
 Also reject inactive, historical, non-opt-in, accountless, centerless, NIT-mismatch,
 empty-item, and total-mismatch configurations.
 
-- [ ] **Step 4: Implement the minimal guard**
+- [x] **Step 4: Implement the minimal guard**
 
 Use `Decimal(str(value))` for comparisons. Do not add scoring or retries:
 
@@ -662,7 +662,7 @@ def evaluate_auto_causacion(
     return AutoCausacionDecision(True, "authorized")
 ```
 
-- [ ] **Step 5: Add the controlled service method**
+- [x] **Step 5: Add the controlled service method**
 
 ```python
 class AutoCausacionService:
@@ -690,7 +690,7 @@ class AutoCausacionService:
 Log the exception without returning secrets or XML. Reuse existing causation
 idempotency; do not implement another retry loop.
 
-- [ ] **Step 6: Invoke it only from the IMAP XML path**
+- [x] **Step 6: Invoke it only from the IMAP XML path**
 
 After `process_xml_document` returns `status == "created"` and a `factura_id`,
 call `try_cause_from_imap_xml`. Never call it from PDF processing, preview, manual
@@ -700,7 +700,7 @@ Extend the email summary with `auto_caused` and `auto_pending`. A rejected or
 failed automatic attempt does not make email processing fail because the invoice
 is safely persisted for manual review.
 
-- [ ] **Step 7: Test successful and failed orchestration**
+- [x] **Step 7: Test successful and failed orchestration**
 
 Assert:
 
@@ -714,7 +714,7 @@ assert await service.try_cause_from_imap_xml("f1") == {
 For an Alegra rejection, assert the invoice is returned to `pendiente`. For an
 ineligible rule, assert `causar_factura` was never called.
 
-- [ ] **Step 8: Run focused tests**
+- [x] **Step 8: Run focused tests**
 
 Run:
 
@@ -725,7 +725,7 @@ pytest -q tests/test_auto_causacion_service.py tests/test_ingestion_service.py t
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add database/schema.sql backend/repositories/config_repository.py backend/services/auto_causacion_service.py backend/services/email_service.py backend/tests
@@ -744,7 +744,7 @@ git commit -m "feat: auto-cause authorized IMAP XML invoices"
 - Create: `frontend/tests/configuracion-mapping.test.mjs`
 - Modify: `backend/tests/test_facturas_router.py`
 
-- [ ] **Step 1: Add typed request models in the existing router**
+- [x] **Step 1: Add typed request models in the existing router**
 
 Do not create a schemas package for two payloads. Define them next to the routes:
 
@@ -775,7 +775,7 @@ update changes NIT, account, or center without explicitly re-sending
 `auto_causar=true`, persist `auto_causar=false` server-side; do not rely only on
 the browser reset.
 
-- [ ] **Step 2: Replace unsupported frontend fields**
+- [x] **Step 2: Replace unsupported frontend fields**
 
 Change `emptyForm` to:
 
@@ -799,13 +799,13 @@ Its copy must state: “Sólo XML recibido por correo. Si una validación falla,
 factura quedará pendiente”. Changing NIT, account, or center resets the checkbox
 to false.
 
-- [ ] **Step 3: Add the cost-center selector**
+- [x] **Step 3: Add the cost-center selector**
 
 Use the already loaded `catalogo.cost_centers` array. Include an explicit
 “Sin centro de costo” option. Display account, center, source, and active state in
 the saved-rules table.
 
-- [ ] **Step 4: Add a small frontend contract test**
+- [x] **Step 4: Add a small frontend contract test**
 
 Extract only a pure payload helper if needed and verify:
 
@@ -822,7 +822,7 @@ assert.deepEqual(buildConfigPayload(form), {
 
 Do not add a browser-testing dependency.
 
-- [ ] **Step 5: Run backend and frontend checks**
+- [x] **Step 5: Run backend and frontend checks**
 
 Run:
 
@@ -837,7 +837,7 @@ npm run build
 
 Expected: all commands PASS and Vite produces `dist`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add backend/routers/config.py backend/repositories/config_repository.py frontend/src/pages/Configuracion.jsx frontend/tests/configuracion-mapping.test.mjs backend/tests
@@ -855,7 +855,7 @@ git commit -m "feat: manage provider account and cost center rules"
 - Modify: `backend/services/factura_service.py`
 - Modify: `backend/tests/test_factura_service.py`
 
-- [ ] **Step 1: Add a causation service regression test**
+- [x] **Step 1: Add a causation service regression test**
 
 Assert that a manual override is persisted before sending to Alegra and that no
 call to `crear_bill` occurs merely by loading or ingesting a factura.
@@ -879,7 +879,7 @@ repository.update_item_fields.assert_awaited_with(
 )
 ```
 
-- [ ] **Step 2: Show classification provenance in the modal**
+- [x] **Step 2: Show classification provenance in the modal**
 
 Replace the generic auto-prefill message with concise copy based on
 `prefill_source`:
@@ -896,14 +896,14 @@ Clasificación sugerida por historial (75 %). Revisa antes de causar.
 
 Keep the selectors editable. Do not add a second confirmation dialog.
 
-- [ ] **Step 3: Keep the explicit cause boundary**
+- [x] **Step 3: Keep the explicit cause boundary**
 
 Verify the browser only calls `causarFactura` from the existing button handler.
 The server-side IMAP exception is covered independently by Task 6. Account must
 be present for every item; center may be empty for manual causation. Preserve the
 loading state so the button cannot submit twice.
 
-- [ ] **Step 4: Run focused checks**
+- [x] **Step 4: Run focused checks**
 
 Run:
 
@@ -918,7 +918,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/services/factura_service.py backend/tests/test_factura_service.py frontend/src/components/FacturaModal.jsx frontend/src/pages/Facturas.jsx
@@ -934,7 +934,7 @@ git commit -m "feat: clarify accounting review before causation"
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-09-18-provider-accounting-prefill.md`
 
-- [ ] **Step 1: Run the complete backend suite**
+- [x] **Step 1: Run the complete backend suite**
 
 Run:
 
@@ -945,7 +945,7 @@ pytest -q
 
 Expected: all tests PASS.
 
-- [ ] **Step 2: Run complete frontend verification**
+- [x] **Step 2: Run complete frontend verification**
 
 Run:
 
@@ -958,7 +958,7 @@ npm run build
 
 Expected: tests and lint PASS; production build succeeds.
 
-- [ ] **Step 3: Perform three local acceptance scenarios**
+- [x] **Step 3: Perform three local acceptance scenarios**
 
 1. Create a Nitido rule with account and center, ingest a sample, verify both are
    prefilled, and stop before pressing cause.
@@ -973,7 +973,7 @@ Expected: tests and lint PASS; production build succeeds.
    center, COP 13.900, IVA 0 %, and the XML description.
 6. Force an Alegra rejection; verify the invoice remains pending and visible.
 
-- [ ] **Step 4: Update operator documentation**
+- [x] **Step 4: Update operator documentation**
 
 Replace stale README claims about AI/Supabase and document:
 
@@ -984,12 +984,29 @@ Replace stale README claims about AI/Supabase and document:
   autocausation rule;
 - how to disable autocausation immediately from the provider rule.
 
-- [ ] **Step 5: Commit the documentation**
+- [x] **Step 5: Commit the documentation**
 
 ```powershell
 git add README.md docs/superpowers/plans/2026-09-18-provider-accounting-prefill.md
 git commit -m "docs: explain provider accounting prefill workflow"
 ```
+
+### Verification evidence (recorded 2026-09-18)
+
+- Backend: `pytest -q` against a throwaway PostgreSQL 16 -> **102 passed** (includes the integration suites and the DEVISAB peaje end-to-end acceptance test).
+- Frontend: `npm test` -> **8 passed**; `npm run lint` clean; `npm run build` succeeds.
+- Acceptance scenarios 1-6 are covered by automated tests: manual-rule prefill for XML and PDF (Nitido/Coordinadora shape), unknown provider without invented mapping and blocked causation, peaje ZIP kept pending with description and IVA 0 %, one authorized bill attempt with the configured account/center/COP 13.900/IVA 0 %/description, and an Alegra rejection returning the invoice to `pendiente`.
+- Screen check: "Mapa de cuentas" run against the real backend and a local PostgreSQL (create with normalized NIT, 409 on duplicate, 422 for autocausation without center, edit form, autocausation reset on NIT change).
+- **Railway deploy and smoke checks (Steps 6-7): NOT DONE.** The Railway session returned `Unauthorized`; a `railway login` is required before deploying.
+
+### Deviations from this plan (and why)
+
+1. Task 1 asserted flat pairs but Task 2's query returns one row per invoice with its item pairs; the query shape of Task 2 was kept because it is what allows one vote per invoice.
+2. Task 3 step 4 (Alegra fallback by bill) and the evaluator/service/persistor pair changes were implemented in Task 2's commit, since Task 2's tests could not pass otherwise.
+3. Task 5: a line without tax node is IVA 0 %, **except** when the invoice header declares IVA while lines omit it, where the legacy 19 % is kept so ordinary invoices do not silently lose tax.
+4. Task 6: a 409 `DUPLICADO_ALEGRA` / `FACTURA_YA_CAUSADA` from `causar_factura` is not returned to `pendiente` (the bill exists in Alegra); every other failure is. Blocked or failed attempts are recorded in `causaciones` with estado `autocausacion_bloqueada` so the reason is visible. Extra guards: invoice must be `pendiente`, no prior successful causation, and every item must already carry the rule's account and cost center.
+5. Task 6: `schema.sql` is not applied automatically in production, so `backend/repositories/schema_upgrades.py` applies the additive `auto_causar` columns idempotently on startup.
+6. Task 5/9 finding: `_to_float` did not recognize `Decimal`, so invoices built from PostgreSQL rows had subtotal/IVA/total 0 and every causation was rejected with "total invalido o cero". Fixed in `models/factura.py` with a regression test.
 
 - [ ] **Step 6: Deploy the worktree branch to Railway**
 
@@ -1027,18 +1044,18 @@ git commit -m "docs: record accounting prefill verification"
 
 ## Completion Checklist
 
-- [ ] No new database table or AI dependency exists.
-- [ ] Manual rules cannot be overwritten automatically.
-- [ ] Historical learning uses only successful causations.
-- [ ] History learns an account-center pair with one vote per invoice.
-- [ ] XML, PDF, upload, and IMAP apply identical mappings.
-- [ ] Nitido and Coordinadora each resolve to one account and one center.
-- [ ] Unknown or ambiguous providers remain for manual review.
-- [ ] The operator can correct classifications before causing.
-- [ ] PDF, carga manual, historial y proveedores sin opt-in nunca autocausan.
-- [ ] Only IMAP XML with an active manual opt-in rule can autocause.
-- [ ] Missing XML tax data produces IVA 0 %, not 19 %.
-- [ ] The exact XML item description reaches the Alegra category observation.
-- [ ] A rejected autocausation returns the invoice to `pendiente`.
-- [ ] Backend tests, frontend tests, lint, and production build pass.
+- [x] No new database table or AI dependency exists.
+- [x] Manual rules cannot be overwritten automatically.
+- [x] Historical learning uses only successful causations.
+- [x] History learns an account-center pair with one vote per invoice.
+- [x] XML, PDF, upload, and IMAP apply identical mappings.
+- [x] Nitido and Coordinadora each resolve to one account and one center.
+- [x] Unknown or ambiguous providers remain for manual review.
+- [x] The operator can correct classifications before causing.
+- [x] PDF, carga manual, historial y proveedores sin opt-in nunca autocausan.
+- [x] Only IMAP XML with an active manual opt-in rule can autocause.
+- [x] Missing XML tax data produces IVA 0 %, not 19 %.
+- [x] The exact XML item description reaches the Alegra category observation.
+- [x] A rejected autocausation returns the invoice to `pendiente`.
+- [x] Backend tests, frontend tests, lint, and production build pass.
 - [ ] Railway smoke checks pass without causing a real invoice.
