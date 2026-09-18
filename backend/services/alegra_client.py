@@ -788,6 +788,7 @@ class AlegraClient:
                     "id": categoria_id,
                     "price": item.precio_unitario,
                     "quantity": item.cantidad,
+                    "observations": (item.descripcion or "")[:500],
                     "costCenter": (
                         {"id": centro_costo_id} if centro_costo_id is not None else None
                     ),

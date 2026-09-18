@@ -180,3 +180,17 @@ async def test_unmapped_provider_gets_no_invented_classification(monkeypatch):
     assert item["cuenta_contable_alegra"] is None
     assert item["centro_costo_alegra"] is None
     assert item["prefill_source"] == "none"
+
+
+def test_peaje_zip_yields_only_the_xml_document():
+    from peaje_fixture import peaje_zip_bytes
+    from services.ingestion.extractor import IngestionExtractor
+
+    result = IngestionExtractor().extract_xml_documents_from_attachment(
+        "peaje.zip", peaje_zip_bytes()
+    )
+
+    assert [doc.entry_name for doc in result["documents"]] == [
+        "peaje.zip/factura.xml"
+    ]
+    assert result["errors"] == []

@@ -52,7 +52,12 @@ class DIANParser:
         totals = self._extract_totals(tree)
         retentions = self._extract_retentions(tree)
         total = self._resolve_total(totals, retentions)
-        items = self._extract_items(tree)
+        # A line without a tax node is 0 % (exempt/excluded, e.g. tolls). Only when
+        # the invoice header declares IVA but the lines omit it do we keep the
+        # legacy 19 % rather than silently dropping tax on a normal invoice.
+        items = self._extract_items(
+            tree, missing_line_tax_percent=19.0 if totals["iva"] > 0 else 0.0
+        )
         dt_emision = self._parse_issue_date(fecha_emision_raw)
 
         factura = FacturaDIAN(
@@ -309,7 +314,9 @@ class DIANParser:
             return result[0].text
         return default
 
-    def _extract_items(self, tree) -> list[FacturaItem]:
+    def _extract_items(
+        self, tree, missing_line_tax_percent: float = 0.0
+    ) -> list[FacturaItem]:
         items: list[FacturaItem] = []
         lines = tree.xpath("//cac:InvoiceLine", namespaces=self.namespaces)
         for line in lines:
@@ -339,9 +346,9 @@ class DIANParser:
                 self._get_line_text(
                     line,
                     "cac:TaxTotal/cac:TaxSubtotal/cac:TaxCategory/cbc:Percent",
-                    default="19",
+                    default=str(missing_line_tax_percent),
                 ),
-                default=19.0,
+                default=missing_line_tax_percent,
             )
 
             items.append(

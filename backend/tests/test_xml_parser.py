@@ -59,3 +59,24 @@ def test_dian_parser_class_parse_matches_wrapper():
     assert by_class.cufe == by_wrapper.cufe
     assert by_class.numero_factura == by_wrapper.numero_factura
     assert by_class.total == by_wrapper.total
+
+
+def test_peaje_invoice_keeps_zero_iva_and_literal_description():
+    from peaje_fixture import PEAJE_ATTACHED_DOCUMENT_XML, PEAJE_DESCRIPTION
+
+    factura = parse_xml_dian(PEAJE_ATTACHED_DOCUMENT_XML)
+
+    assert factura.nit_proveedor == "901209021"
+    assert factura.numero_factura == "FEUU2183418"
+    assert factura.subtotal == 13900
+    assert factura.iva == 0
+    assert factura.total == 13900
+    assert factura.items[0].iva_porcentaje == 0
+    assert factura.items[0].descripcion == PEAJE_DESCRIPTION
+
+
+def test_line_without_tax_node_keeps_legacy_rate_when_header_declares_iva():
+    # _invoice_xml() has header IVA (190) but no per-line tax node.
+    factura = parse_xml_dian(_invoice_xml())
+
+    assert factura.items[0].iva_porcentaje == 19

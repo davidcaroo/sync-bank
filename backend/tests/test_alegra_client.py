@@ -221,3 +221,68 @@ def test_resolve_tax_id_for_percentage_returns_none_when_no_match():
     tax_id = client._resolve_tax_id_for_percentage(taxes, 19.0)
 
     assert tax_id is None
+
+
+class _BillClient:
+    def __init__(self):
+        self.posted = None
+
+    async def get(self, url, params=None, headers=None):
+        if url.endswith("/contacts"):
+            return _FakeResponse(
+                200,
+                payload=[{"id": "7", "identification": "901209021", "name": "DEVISAB"}],
+            )
+        if url.endswith("/taxes"):
+            return _FakeResponse(200, payload=[])
+        return _FakeResponse(404, payload={}, text="not found")
+
+    async def post(self, url, json=None, headers=None):
+        self.posted = json
+        return _FakeResponse(201, payload={"id": "bill-1"})
+
+
+class _BillClientContext:
+    def __init__(self, client):
+        self._client = client
+
+    async def __aenter__(self):
+        return self._client
+
+    async def __aexit__(self, *args):
+        return False
+
+
+@pytest.mark.asyncio
+async def test_bill_payload_carries_item_description_and_no_tax_for_zero_iva():
+    from peaje_fixture import PEAJE_DESCRIPTION
+
+    http = _BillClient()
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+    factura = FacturaDIAN(
+        cufe="PEAJE-CUFE-0001",
+        numero_factura="FEUU2183418",
+        nit_proveedor="901209021",
+        nombre_proveedor="DEVISAB S.A.S.",
+        subtotal=13900,
+        iva=0,
+        total=13900,
+        items=[
+            FacturaItem(
+                descripcion=PEAJE_DESCRIPTION,
+                cantidad=1,
+                precio_unitario=13900,
+                descuento=0,
+                iva_porcentaje=0,
+                total_linea=13900,
+                cuenta_contable_alegra="5105",
+                centro_costo_alegra="12",
+            )
+        ],
+    )
+
+    await client.crear_bill(factura)
+
+    category = http.posted["purchases"]["categories"][0]
+    assert category["observations"] == PEAJE_DESCRIPTION
+    assert "tax" not in category
