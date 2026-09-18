@@ -2,7 +2,12 @@ from decimal import Decimal
 
 import pytest
 
-from repositories.factura_repository import find_factura_by_cufe, save_factura
+from repositories.factura_repository import (
+    find_factura_by_cufe,
+    list_confirmed_provider_mappings,
+    save_causacion,
+    save_factura,
+)
 
 
 def test_save_factura_inserts_invoice_and_items():
@@ -62,3 +67,56 @@ def test_save_factura_rolls_back_when_an_item_is_invalid():
         )
 
     assert find_factura_by_cufe("CUFE-ROLLBACK-1") is None
+
+
+def _saved_invoice(cufe, nit, items, causacion_estado=None, estado="pendiente"):
+    result = save_factura(
+        {
+            "cufe": cufe,
+            "numero_factura": cufe,
+            "nit_proveedor": nit,
+            "estado": estado,
+            "total": Decimal("10.00"),
+        },
+        items,
+    )
+    if causacion_estado:
+        save_causacion(
+            {
+                "factura_id": result["factura_id"],
+                "alegra_bill_id": None,
+                "alegra_response": {},
+                "estado": causacion_estado,
+                "intentos": 1,
+                "error_msg": None,
+            }
+        )
+    return result["factura_id"]
+
+
+def _item(cuenta, centro):
+    return {
+        "descripcion": "Servicio",
+        "cantidad": Decimal("1"),
+        "precio_unitario": Decimal("10.00"),
+        "total_linea": Decimal("10.00"),
+        "cuenta_contable_alegra": cuenta,
+        "centro_costo_alegra": centro,
+    }
+
+
+def test_confirmed_history_excludes_unconfirmed_invoices_and_counts_one_row_each():
+    nit = "900123456"
+    _saved_invoice("HIST-PEND", nit, [_item("9999", "99")])
+    _saved_invoice("HIST-FAIL", nit, [_item("9999", "99")], causacion_estado="fallido")
+    for index in range(3):
+        items = [_item("5105", "12")] * (index + 1)
+        _saved_invoice(f"HIST-OK-{index}", nit, items, "exitoso", "procesado")
+
+    rows = list_confirmed_provider_mappings(nit)
+
+    assert len(rows) == 3
+    for row in rows:
+        assert {(m["cuenta"], m["centro_costo"]) for m in row["mappings"]} == {
+            ("5105", "12")
+        }
