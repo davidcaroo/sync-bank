@@ -2,6 +2,7 @@ import React from 'react'
 import { X } from 'lucide-react'
 import { StatusBadge } from './DashboardBase'
 import { describePrefill, hasMissingAccount } from '../lib/prefillNotice'
+import { activeCostCenters } from '../lib/costCenters'
 
 export default function FacturaModal({
   factura,
@@ -13,6 +14,10 @@ export default function FacturaModal({
   costCenters = [],
 }) {
   if (!factura) return null
+
+  // Only active centers are offered; an inactive one already on an item is still
+  // shown below as "registrado en Alegra" so it is not silently lost.
+  const availableCostCenters = activeCostCenters(costCenters)
 
   const facturaEstado = String(factura.estado || '').toLowerCase()
   const isRecausar = facturaEstado === 'procesado' || facturaEstado === 'causado' || facturaEstado === 'duplicado'
@@ -178,7 +183,7 @@ export default function FacturaModal({
                     const cuentaActual = item.cuenta_contable_alegra ? String(item.cuenta_contable_alegra) : ''
                     const centroActual = item.centro_costo_alegra ? String(item.centro_costo_alegra) : ''
                     const hasCuentaInCatalog = categories.some((cat) => String(cat.id) === cuentaActual)
-                    const hasCentroInCatalog = costCenters.some((cc) => String(cc.id) === centroActual)
+                    const hasCentroInCatalog = availableCostCenters.some((cc) => String(cc.id) === centroActual)
 
                     return (
                     <tr key={item.id || `${item.descripcion}-${item.total_linea}`}>
@@ -244,7 +249,7 @@ export default function FacturaModal({
                               {centroActual} | (registrado en Alegra)
                             </option>
                           )}
-                          {costCenters.map((cc) => (
+                          {availableCostCenters.map((cc) => (
                             <option key={cc.id} value={cc.id}>
                               {cc.id} | {cc.name}
                             </option>
