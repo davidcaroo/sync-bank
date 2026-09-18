@@ -271,8 +271,12 @@ async def update_contacto(contact_id: str, payload: ContactPayload):
                     existing = await alegra_service.get_contact(client, contact_id)
                 except Exception:
                     existing = None
+            alegra_payload = _to_alegra_payload(payload, existing)
+            if not payload.contact_type:
+                # Don't reset the contact's type to the create-time default.
+                alegra_payload.pop("type", None)
             data = await alegra_service.update_contact(
-                client, contact_id, _to_alegra_payload(payload, existing)
+                client, contact_id, alegra_payload
             )
     except Exception as exc:
         raise HTTPException(

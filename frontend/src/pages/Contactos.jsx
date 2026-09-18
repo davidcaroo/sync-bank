@@ -256,7 +256,11 @@ export default function Contactos() {
     const nextStatus = row.status === 'active' ? 'inactive' : 'active'
     setLoading(true)
     try {
-      await updateContacto(row.id, { ...row, status: nextStatus })
+      await updateContacto(row.id, {
+        ...row,
+        contact_type: row.type?.length ? row.type : undefined,
+        status: nextStatus,
+      })
       await fetchData(page)
       toast.success(`Contacto ${nextStatus === 'active' ? 'activado' : 'desactivado'}.`)
     } catch {
