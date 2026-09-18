@@ -37,6 +37,13 @@ def get_config_cuenta(nit: str) -> dict[str, Any] | None:
         ).fetchone()
 
 
+def get_config_cuenta_by_id(config_id: str) -> dict[str, Any] | None:
+    with connection() as conn:
+        return conn.execute(
+            "select * from config_cuentas where id = %s", (config_id,)
+        ).fetchone()
+
+
 def sync_config_proveedor_nombre(nit: str | None, nombre_proveedor: str | None) -> None:
     digits = normalize_nit(nit)
     if not digits or not nombre_proveedor:

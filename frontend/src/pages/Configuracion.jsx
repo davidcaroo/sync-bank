@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconFolder as Building2,
   IconArchive as Landmark,
@@ -8,7 +8,6 @@ import {
   IconRefresh,
   IconEdit,
   IconX,
-  IconSearch
 } from '../components/icons/Icons'
 import ConfirmDialog from '../components/ConfirmDialog'
 import {
@@ -19,33 +18,62 @@ import {
   isApiConfigured,
   updateConfigCuenta,
 } from '../lib/api'
+import { buildConfigPayload, withClassificationChange } from '../lib/configPayload'
 import { useToast } from '../components/ToastProvider'
 
 const emptyForm = {
-  nit_proveedor:    '',
-  nombre_cuenta:    '',
+  nit_proveedor: '',
+  nombre_proveedor: '',
   id_cuenta_alegra: '',
-  id_retefuente:    '',
-  id_reteica:       '',
-  id_reteiva:       '',
-  activo:           true,
+  id_centro_costo_alegra: '',
+  auto_causar: false,
+  activo: true,
+}
+
+const SOURCE_LABELS = {
+  manual: 'Manual',
+  historical: 'Historial',
+  alegra: 'Alegra',
+  auto: 'Automático',
+}
+
+const getErrorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail
+  return typeof detail === 'string' && detail.trim() ? detail : fallback
 }
 
 export default function Configuracion() {
-  const toast       = useToast()
+  const toast = useToast()
   const formCardRef = useRef(null)
 
-  const [data,          setData]          = useState([])
-  const [catalogo,      setCatalogo]      = useState({ categories: [], cost_centers: [] })
-  const [form,          setForm]          = useState(emptyForm)
-  const [editingId,     setEditingId]     = useState(null)
-  const [loading,       setLoading]       = useState(false)
-  const [catalogLoading,setCatalogLoading]= useState(false)
-  const [error,         setError]         = useState(null)
-  const [deleteTarget,  setDeleteTarget]  = useState(null)
+  const [data, setData] = useState([])
+  const [catalogo, setCatalogo] = useState({ categories: [], cost_centers: [] })
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  /* ── data fetchers ─────────────────────────────────────── */
+  const accountLabel = useMemo(() => {
+    const byId = new Map(catalogo.categories.map((item) => [String(item.id), item]))
+    return (id) => {
+      if (!id) return '—'
+      const item = byId.get(String(id))
+      return item ? `${item.code || item.id} | ${item.name}` : `${id} (registrada)`
+    }
+  }, [catalogo.categories])
+
+  const centerLabel = useMemo(() => {
+    const byId = new Map(catalogo.cost_centers.map((item) => [String(item.id), item]))
+    return (id) => {
+      if (!id) return 'Sin centro'
+      const item = byId.get(String(id))
+      return item ? `${item.id} | ${item.name}` : `${id} (registrado)`
+    }
+  }, [catalogo.cost_centers])
+
   const fetchData = async () => {
     if (!isApiConfigured) { setError('VITE_API_URL no está configurado.'); return }
     setLoading(true); setError(null)
@@ -64,7 +92,7 @@ export default function Configuracion() {
     try {
       const response = await getAlegraCatalogo(refresh ? { refresh: true } : undefined)
       setCatalogo({
-        categories:   response.data?.categories   || [],
+        categories: response.data?.categories || [],
         cost_centers: response.data?.cost_centers || [],
       })
     } catch {
@@ -75,57 +103,54 @@ export default function Configuracion() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); fetchCatalogo() }, [])
 
-  /* ── form handlers ─────────────────────────────────────── */
-  const handleCuentaChange = (value) => {
-    const match = catalogo.categories.find((item) => String(item.id) === String(value))
-    setForm((prev) => ({ ...prev, id_cuenta_alegra: value, nombre_cuenta: match?.name || prev.nombre_cuenta }))
-  }
+  const setClassification = (field, value) =>
+    setForm((prev) => withClassificationChange(prev, field, value))
 
   const resetForm = () => { setForm(emptyForm); setEditingId(null) }
 
   const handleSubmit = async () => {
+    if (!form.id_cuenta_alegra) {
+      toast.warning('Selecciona la cuenta de Alegra.')
+      return
+    }
     setLoading(true); setError(null)
     try {
-      const payload = {
-        ...form,
-        id_retefuente: form.id_retefuente || null,
-        id_reteica:    form.id_reteica    || null,
-        id_reteiva:    form.id_reteiva    || null,
-      }
+      const payload = buildConfigPayload(form)
       if (editingId) {
         await updateConfigCuenta(editingId, payload)
       } else {
         await createConfigCuenta(payload)
       }
+      const wasEditing = Boolean(editingId)
       resetForm(); await fetchData()
-      toast.success(editingId ? 'Configuración actualizada.' : 'Mapeo creado correctamente.')
-    } catch {
-      setError('No se pudo guardar el registro.')
-      toast.error('No se pudo guardar el mapeo de cuenta.')
+      toast.success(wasEditing ? 'Regla actualizada.' : 'Regla creada correctamente.')
+    } catch (err) {
+      const message = getErrorMessage(err, 'No se pudo guardar el registro.')
+      setError(message)
+      toast.error(message)
     } finally { setLoading(false) }
   }
 
   const handleEdit = (row) => {
     setEditingId(row.id)
     setForm({
-      nit_proveedor:    row.nit_proveedor    || '',
-      nombre_cuenta:    row.nombre_cuenta    || '',
+      nit_proveedor: row.nit_proveedor || '',
+      nombre_proveedor: row.nombre_proveedor || '',
       id_cuenta_alegra: row.id_cuenta_alegra || '',
-      id_retefuente:    row.id_retefuente    || '',
-      id_reteica:       row.id_reteica       || '',
-      id_reteiva:       row.id_reteiva       || '',
-      activo:           row.activo ?? true,
+      id_centro_costo_alegra: row.id_centro_costo_alegra || '',
+      auto_causar: Boolean(row.auto_causar),
+      activo: row.activo ?? true,
     })
     formCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    toast.info(`Editando mapeo para NIT ${row.nit_proveedor}.`)
+    toast.info(`Editando regla para NIT ${row.nit_proveedor}.`)
   }
 
   const handleToggle = async (row) => {
     try {
       await updateConfigCuenta(row.id, { activo: !row.activo })
       await fetchData()
-    } catch {
-      toast.error('No se pudo cambiar el estado del registro.')
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'No se pudo cambiar el estado del registro.'))
     }
   }
 
@@ -141,14 +166,18 @@ export default function Configuracion() {
     } finally { setDeleteLoading(false); setDeleteTarget(null) }
   }
 
-  /* ── render ─────────────────────────────────────────────── */
+  const canAutoCausar = Boolean(form.id_cuenta_alegra && form.id_centro_costo_alegra)
+  const accountMissingFromCatalog = form.id_cuenta_alegra
+    && !catalogo.categories.some((item) => String(item.id) === String(form.id_cuenta_alegra))
+  const centerMissingFromCatalog = form.id_centro_costo_alegra
+    && !catalogo.cost_centers.some((item) => String(item.id) === String(form.id_centro_costo_alegra))
+
   return (
     <div className="page-shell">
-      {/* ── Page heading ─────────────────────────────────── */}
       <div className="page-heading">
         <div>
           <h1 className="page-heading-title">Mapa de Cuentas</h1>
-          <p className="page-heading-sub">Mapeo NIT → cuentas contables en Alegra</p>
+          <p className="page-heading-sub">Reglas por proveedor (NIT): cuenta y centro de costo en Alegra</p>
         </div>
         <button
           className="btn-secondary btn-sm"
@@ -156,9 +185,9 @@ export default function Configuracion() {
           disabled={catalogLoading}
           style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          <IconRefresh 
-            size={14} 
-            style={{ animation: catalogLoading ? 'spin 1s linear infinite' : 'none' }} 
+          <IconRefresh
+            size={14}
+            style={{ animation: catalogLoading ? 'spin 1s linear infinite' : 'none' }}
           />
           {catalogLoading ? 'Actualizando catálogo…' : 'Actualizar catálogo Alegra'}
         </button>
@@ -166,21 +195,20 @@ export default function Configuracion() {
 
       {error && (
         <div className="ui-alert" role="alert">
-          <div><strong>No pudimos cargar el mapa de cuentas.</strong><span>{error}</span></div>
+          <div><strong>No pudimos cargar o guardar el mapa de cuentas.</strong><span>{error}</span></div>
           <button type="button" className="btn-secondary btn-sm" onClick={fetchData}>Reintentar</button>
         </div>
       )}
 
-      {/* ── Form card ────────────────────────────────────── */}
       <div className="sb-card" ref={formCardRef}>
         <div className="sb-card-header">
           <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Plus size={14} />
-            {editingId ? 'Editar registro' : 'Nuevo registro'}
+            {editingId ? 'Editar regla' : 'Nueva regla'}
           </h2>
           {editingId && (
-            <button 
-              className="btn-secondary btn-sm" 
+            <button
+              className="btn-secondary btn-sm"
               onClick={resetForm}
               style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
             >
@@ -190,33 +218,32 @@ export default function Configuracion() {
         </div>
 
         <div className="sb-card-body">
-          {/* 6-field grid: 3 cols on md+ */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
               gap: '0.75rem',
               marginBottom: '1rem',
             }}
           >
             <div>
-              <label htmlFor="cfg-nit">NIT Proveedor</label>
+              <label htmlFor="cfg-nit">NIT proveedor</label>
               <input
                 id="cfg-nit"
                 className="input"
                 placeholder="900123456"
                 value={form.nit_proveedor}
-                onChange={(e) => setForm((p) => ({ ...p, nit_proveedor: e.target.value }))}
+                onChange={(e) => setClassification('nit_proveedor', e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="cfg-nombre">Nombre cuenta</label>
+              <label htmlFor="cfg-nombre">Nombre proveedor</label>
               <input
                 id="cfg-nombre"
                 className="input"
-                placeholder="Ej. Compras nacionales"
-                value={form.nombre_cuenta}
-                onChange={(e) => setForm((p) => ({ ...p, nombre_cuenta: e.target.value }))}
+                placeholder="Ej. Nitido Car Wash"
+                value={form.nombre_proveedor}
+                onChange={(e) => setForm((p) => ({ ...p, nombre_proveedor: e.target.value }))}
               />
             </div>
             <div>
@@ -225,9 +252,12 @@ export default function Configuracion() {
                 id="cfg-cuenta"
                 className="input"
                 value={form.id_cuenta_alegra}
-                onChange={(e) => handleCuentaChange(e.target.value)}
+                onChange={(e) => setClassification('id_cuenta_alegra', e.target.value)}
               >
                 <option value="">— Selecciona —</option>
+                {accountMissingFromCatalog && (
+                  <option value={form.id_cuenta_alegra}>{accountLabel(form.id_cuenta_alegra)}</option>
+                )}
                 {catalogo.categories.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.code || item.id} | {item.name}
@@ -236,38 +266,48 @@ export default function Configuracion() {
               </select>
             </div>
             <div>
-              <label htmlFor="cfg-retefuente">ID Retefuente</label>
-              <input
-                id="cfg-retefuente"
+              <label htmlFor="cfg-centro">Centro de costo</label>
+              <select
+                id="cfg-centro"
                 className="input"
-                placeholder="ID retención en la fuente"
-                value={form.id_retefuente}
-                onChange={(e) => setForm((p) => ({ ...p, id_retefuente: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="cfg-reteica">ID Reteica</label>
-              <input
-                id="cfg-reteica"
-                className="input"
-                placeholder="ID reteica"
-                value={form.id_reteica}
-                onChange={(e) => setForm((p) => ({ ...p, id_reteica: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="cfg-reteiva">ID Reteiva</label>
-              <input
-                id="cfg-reteiva"
-                className="input"
-                placeholder="ID reteiva"
-                value={form.id_reteiva}
-                onChange={(e) => setForm((p) => ({ ...p, id_reteiva: e.target.value }))}
-              />
+                value={form.id_centro_costo_alegra}
+                onChange={(e) => setClassification('id_centro_costo_alegra', e.target.value)}
+              >
+                <option value="">Sin centro de costo</option>
+                {centerMissingFromCatalog && (
+                  <option value={form.id_centro_costo_alegra}>{centerLabel(form.id_centro_costo_alegra)}</option>
+                )}
+                {catalogo.cost_centers.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.id} | {item.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Form footer row */}
+          {canAutoCausar && (
+            <label
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '1rem',
+                fontSize: '0.85rem', fontWeight: 600, textTransform: 'none', letterSpacing: 0,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.auto_causar}
+                onChange={(e) => setForm((p) => ({ ...p, auto_causar: e.target.checked }))}
+                style={{ marginTop: '0.2rem' }}
+              />
+              <span>
+                Autocausar en Alegra
+                <span className="text-muted text-sm" style={{ display: 'block', fontWeight: 500 }}>
+                  Sólo XML recibido por correo. Si una validación falla, la factura quedará pendiente.
+                </span>
+              </span>
+            </label>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem', fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
               <input
@@ -275,7 +315,7 @@ export default function Configuracion() {
                 checked={form.activo}
                 onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))}
               />
-              Activo
+              Activa
             </label>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -286,17 +326,15 @@ export default function Configuracion() {
               )}
               <button className="btn-primary" onClick={handleSubmit} disabled={loading} id="btn-guardar-cuenta">
                 <Save size={14} />
-                {loading ? 'Guardando…' : 'Guardar mapeo'}
+                {loading ? 'Guardando…' : 'Guardar regla'}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Catálogo de Alegra – dos cards lado a lado ──── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}
            className="catalog-grid">
-        {/* Cuentas contables */}
         <div className="sb-card" style={{ marginBottom: 0 }}>
           <div className="sb-card-header">
             <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -304,10 +342,7 @@ export default function Configuracion() {
             </h2>
             <span className="text-muted text-xs fw-bold">{catalogo.categories.length} registros</span>
           </div>
-          <div
-            className="table-responsive"
-            style={{ maxHeight: '350px', overflowY: 'auto' }}
-          >
+          <div className="table-responsive" style={{ maxHeight: '350px', overflowY: 'auto' }}>
             <table className="table-admin" style={{ minWidth: 0 }}>
               <thead>
                 <tr>
@@ -338,7 +373,6 @@ export default function Configuracion() {
           </div>
         </div>
 
-        {/* Centros de costo */}
         <div className="sb-card" style={{ marginBottom: 0 }}>
           <div className="sb-card-header">
             <h2 className="sb-card-header-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -346,10 +380,7 @@ export default function Configuracion() {
             </h2>
             <span className="text-muted text-xs fw-bold">{catalogo.cost_centers.length} registros</span>
           </div>
-          <div
-            className="table-responsive"
-            style={{ maxHeight: '350px', overflowY: 'auto' }}
-          >
+          <div className="table-responsive" style={{ maxHeight: '350px', overflowY: 'auto' }}>
             <table className="table-admin" style={{ minWidth: 0 }}>
               <thead>
                 <tr>
@@ -385,21 +416,22 @@ export default function Configuracion() {
         </div>
       </div>
 
-      {/* ── Registros guardados ──────────────────────────── */}
       <div className="sb-card">
         <div className="sb-card-header">
-          <h2 className="sb-card-header-title">Mapeos registrados</h2>
-          <span className="text-muted text-xs fw-bold">{data.length} registro{data.length !== 1 ? 's' : ''}</span>
+          <h2 className="sb-card-header-title">Reglas por proveedor</h2>
+          <span className="text-muted text-xs fw-bold">{data.length} regla{data.length !== 1 ? 's' : ''}</span>
         </div>
         <div className="table-responsive">
-          <table className="table-admin" aria-label="Mapeos de cuentas">
+          <table className="table-admin" aria-label="Reglas por proveedor">
             <thead>
               <tr>
-                <th>NIT Proveedor</th>
-                <th className="d-none-mobile">Proveedor</th>
+                <th>NIT</th>
+                <th>Proveedor</th>
                 <th>Cuenta</th>
-                <th className="d-none-mobile">ID Alegra</th>
-                <th>Activo</th>
+                <th className="d-none-mobile">Centro de costo</th>
+                <th className="d-none-mobile">Origen</th>
+                <th className="d-none-mobile">Autocausa</th>
+                <th>Estado</th>
                 <th style={{ width: '130px' }}>Acciones</th>
               </tr>
             </thead>
@@ -408,9 +440,11 @@ export default function Configuracion() {
                 Array.from({ length: 5 }).map((_, index) => (
                   <tr key={`loading-${index}`} aria-hidden="true">
                     <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
-                    <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
                     <td><span className="skeleton skeleton-line" /></td>
-                    <td className="d-none-mobile"><span className="skeleton skeleton-line skeleton-line-short" /></td>
+                    <td><span className="skeleton skeleton-line" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-line" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-chip" /></td>
+                    <td className="d-none-mobile"><span className="skeleton skeleton-chip" /></td>
                     <td><span className="skeleton skeleton-chip" /></td>
                     <td><span className="skeleton skeleton-line skeleton-line-short" /></td>
                   </tr>
@@ -419,20 +453,28 @@ export default function Configuracion() {
               {!loading && data.map((row) => (
                 <tr key={row.id}>
                   <td className="fw-bold">{row.nit_proveedor}</td>
-                  <td className="d-none-mobile text-muted">{row.nombre_proveedor || '—'}</td>
-                  <td>{row.nombre_cuenta}</td>
-                  <td className="d-none-mobile text-muted">{row.id_cuenta_alegra || '—'}</td>
+                  <td className="text-muted">{row.nombre_proveedor || '—'}</td>
+                  <td className="text-sm">{accountLabel(row.id_cuenta_alegra)}</td>
+                  <td className="d-none-mobile text-sm">{centerLabel(row.id_centro_costo_alegra)}</td>
+                  <td className="d-none-mobile">
+                    <span className="status-badge badge-info">{SOURCE_LABELS[row.source] || row.source || '—'}</span>
+                  </td>
+                  <td className="d-none-mobile">
+                    <span className={`status-badge ${row.auto_causar ? 'badge-warning' : 'badge-muted'}`}>
+                      {row.auto_causar ? 'Sí' : 'No'}
+                    </span>
+                  </td>
                   <td>
                     <button
                       className={`status-badge ${row.activo ? 'badge-success' : 'badge-muted'}`}
                       onClick={(e) => { e.stopPropagation(); handleToggle(row) }}
                       title="Alternar estado"
                     >
-                      {row.activo ? 'Activo' : 'Inactivo'}
+                      {row.activo ? 'Activa' : 'Inactiva'}
                     </button>
                   </td>
                   <td>
-                     <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
                       <button
                         title="Editar"
                         className="btn-secondary btn-sm"
@@ -455,13 +497,13 @@ export default function Configuracion() {
               ))}
               {!loading && data.length === 0 && (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={8}>
                     <div className="table-empty">
                       <div className="table-empty-icon" style={{ opacity: 0.2 }}>
                         <Landmark size={48} />
                       </div>
-                      <p className="fw-bold">No hay mapeos configurados</p>
-                      <p className="text-sm text-muted mt-1">Crea el primer mapeo en el formulario superior.</p>
+                      <p className="fw-bold">No hay reglas configuradas</p>
+                      <p className="text-sm text-muted mt-1">Crea la primera regla en el formulario superior.</p>
                     </div>
                   </td>
                 </tr>
@@ -471,13 +513,12 @@ export default function Configuracion() {
         </div>
       </div>
 
-      {/* ── Confirm dialog ───────────────────────────────── */}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Confirmar eliminación"
         message={
           deleteTarget
-            ? `Vas a eliminar la configuración del NIT ${deleteTarget.nit_proveedor}. Esta acción no se puede deshacer.`
+            ? `Vas a eliminar la regla del NIT ${deleteTarget.nit_proveedor}. Esta acción no se puede deshacer.`
             : ''
         }
         confirmLabel="Eliminar"
