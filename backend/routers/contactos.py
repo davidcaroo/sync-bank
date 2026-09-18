@@ -62,11 +62,45 @@ def _normalize_contact(contact: dict) -> dict:
     }
 
 
-def _to_alegra_payload(payload: ContactPayload) -> dict:
+_NAME_OBJECT_KEYS = ("firstName", "secondName", "lastName", "secondLastName")
+
+
+def _split_person_name(full_name: str) -> dict:
+    # ponytail: positional heuristic (given [+ second given] + surname [+ second
+    # surname]); ignores particles like "DE LA". Existing nameObject is reused
+    # whenever the name is unchanged, so this only runs for new/renamed people.
+    tokens = (full_name or "").split()
+    if len(tokens) >= 4:
+        parts = [tokens[0], " ".join(tokens[1:-2]), tokens[-2], tokens[-1]]
+    elif len(tokens) == 3:
+        parts = [tokens[0], "", tokens[1], tokens[2]]
+    elif len(tokens) == 2:
+        parts = [tokens[0], "", tokens[1], ""]
+    else:
+        parts = [tokens[0] if tokens else "", "", "", ""]
+    return {key: value for key, value in zip(_NAME_OBJECT_KEYS, parts) if value}
+
+
+def _person_name_object(name: str, existing: dict | None) -> dict:
+    existing_obj = (existing or {}).get("nameObject")
+    if isinstance(existing_obj, dict):
+        joined = " ".join(
+            str(existing_obj.get(key) or "").strip() for key in _NAME_OBJECT_KEYS
+        ).split()
+        if " ".join(joined).lower() == " ".join(name.split()).lower():
+            return existing_obj
+    return _split_person_name(name)
+
+
+def _to_alegra_payload(payload: ContactPayload, existing: dict | None = None) -> dict:
     data = {
         "name": payload.name,
         "type": payload.contact_type or ["provider"],
     }
+
+    # Alegra rejects natural persons without nameObject (error 2110).
+    if payload.kind_of_person == "PERSON_ENTITY":
+        data["nameObject"] = _person_name_object(payload.name, existing)
 
     if payload.identification:
         data["identification"] = payload.identification
@@ -231,8 +265,14 @@ async def create_contacto(payload: ContactPayload):
 async def update_contacto(contact_id: str, payload: ContactPayload):
     try:
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True) as client:
+            existing = None
+            if payload.kind_of_person == "PERSON_ENTITY":
+                try:
+                    existing = await alegra_service.get_contact(client, contact_id)
+                except Exception:
+                    existing = None
             data = await alegra_service.update_contact(
-                client, contact_id, _to_alegra_payload(payload)
+                client, contact_id, _to_alegra_payload(payload, existing)
             )
     except Exception as exc:
         raise HTTPException(
