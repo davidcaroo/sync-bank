@@ -51,3 +51,16 @@ def test_nit_is_normalized_to_digits_when_saving_and_reading():
 
     assert get_config_cuenta("9001234581")["id_cuenta_alegra"] == "5105"
     assert get_config_cuenta("900.123.458-1")["id_cuenta_alegra"] == "5105"
+
+
+def test_saving_an_unchanged_rule_does_not_add_audit_rows():
+    for _ in range(2):
+        save_config_cuenta("900123459", "Proveedor", "5105", "12", 1, source="manual")
+
+    with connection() as conn:
+        audit_count = conn.execute(
+            "select count(*) as count from config_cuentas_audit where nit_proveedor = %s",
+            ("900123459",),
+        ).fetchone()["count"]
+
+    assert audit_count == 1
