@@ -183,7 +183,7 @@ export default function Facturas() {
   }
 
   const handleCausar = async () => {
-    if (!selected) return
+    if (!selected || causarLoading) return
     setCausarLoading(true)
     try {
       const itemOverrides = (selected.items_factura || []).map((item) => ({

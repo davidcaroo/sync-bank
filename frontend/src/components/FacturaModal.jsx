@@ -1,6 +1,7 @@
 import React from 'react'
 import { X } from 'lucide-react'
 import { StatusBadge } from './DashboardBase'
+import { describePrefill, hasMissingAccount } from '../lib/prefillNotice'
 
 export default function FacturaModal({
   factura,
@@ -25,7 +26,8 @@ export default function FacturaModal({
   const totalBruto = Number(factura.total_bruto || subtotal + iva)
   const totalRetenciones = Number(factura.total_retenciones || reteFuente + reteIca + reteIva)
   const totalNeto = Number(factura.total_neto || factura.total || 0)
-  const hasAutoPrefill = items.some((item) => ['config', 'ai', 'historical', 'alegra'].includes(item.prefill_source))
+  const prefillNotice = describePrefill(items)
+  const missingAccount = hasMissingAccount(items)
 
   return (
     <div
@@ -113,18 +115,20 @@ export default function FacturaModal({
             </div>
           </div>
 
-          {hasAutoPrefill && (
+          {prefillNotice && (
             <div
+              role="status"
               style={{
                 marginTop: '0.85rem',
                 border: '1px dashed var(--border)',
                 borderRadius: '0.375rem',
                 padding: '0.6rem 0.85rem',
                 background: 'var(--panel-soft)',
+                color: prefillNotice.tone === 'warning' ? 'var(--warning)' : 'inherit',
               }}
               className="text-sm"
             >
-              Se aplico autocompletado de cuentas contables. Puedes editar cualquier cuenta antes de causar.
+              {prefillNotice.text}
             </div>
           )}
 
@@ -234,7 +238,7 @@ export default function FacturaModal({
                             onItemChange?.(item.id, 'centro_costo_alegra', e.target.value)
                           }
                         >
-                          <option value="">Sin centro</option>
+                          <option value="">Sin centro de costo</option>
                           {centroActual && !hasCentroInCatalog && (
                             <option value={centroActual}>
                               {centroActual} | (registrado en Alegra)
@@ -286,7 +290,8 @@ export default function FacturaModal({
 
           <button
             onClick={onCausar}
-            disabled={loading}
+            disabled={loading || missingAccount}
+            title={missingAccount ? 'Selecciona la cuenta contable de cada ítem para poder causar' : undefined}
             className="btn-success"
             id="btn-causar-alegra"
           >
