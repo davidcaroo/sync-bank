@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -11,7 +12,8 @@ def _to_float(value: object, default: float = 0.0) -> float:
         return default
     if isinstance(value, bool):
         return default
-    if isinstance(value, (int, float)):
+    # PostgreSQL numeric columns arrive as Decimal.
+    if isinstance(value, (int, float, Decimal)):
         return float(value)
     if isinstance(value, str):
         raw = value.strip().replace(",", "")

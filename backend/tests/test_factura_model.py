@@ -54,3 +54,20 @@ def test_factura_normalize_sets_defaults_and_totals():
     assert normalized.subtotal == 1000.0
     assert normalized.total == 1175.0
     assert normalized.items[0].descripcion == "Item 1"
+
+
+def test_decimal_amounts_from_postgres_are_not_zeroed():
+    from decimal import Decimal
+
+    from models.factura import FacturaDIAN
+
+    factura = FacturaDIAN(
+        subtotal=Decimal("13900.00"),
+        iva=Decimal("0.00"),
+        rete_fuente=Decimal("10.50"),
+        total=Decimal("13889.50"),
+    )
+
+    assert factura.subtotal == 13900
+    assert factura.rete_fuente == 10.5
+    assert factura.total == 13889.5
