@@ -1,3 +1,4 @@
+import html
 import logging
 import json
 import base64
@@ -93,14 +94,19 @@ async def require_admin(request: Request, call_next):
     return await call_next(request)
 
 
-LOGIN_PAGE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Sync-bank</title>
-<style>body{margin:0;background:#07111f;color:#e8eef7;font:16px system-ui;display:grid;place-items:center;min-height:100vh}form{width:min(360px,calc(100% - 48px));background:#101d2d;padding:32px;border:1px solid #26394f;border-radius:14px;box-shadow:0 24px 70px #0008}h1{margin:0 0 8px}p{color:#9fb0c5;margin:0 0 24px}label{display:block;margin:16px 0 6px}input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:8px;font:inherit}input{border:1px solid #38506b;background:#07111f;color:white}button{margin-top:22px;border:0;background:#2f6fed;color:white;font-weight:700;cursor:pointer}.error{color:#ff9b9b;margin-top:14px}</style></head><body><form method="post"><h1>Sync-bank</h1><p>Acceso administrativo</p><label>Usuario</label><input name="username" autocomplete="username" required><label>Contraseña</label><input name="password" type="password" autocomplete="current-password" required><button>Ingresar</button>{error}</form></body></html>"""
+LOGIN_TEMPLATE = (Path(__file__).parent / "login.html").read_text(encoding="utf-8")
+
+
+def _render_login(*, error: bool = False, username: str = "") -> str:
+    alert = '<div class="alert" role="alert">Credenciales incorrectas</div>' if error else ""
+    return LOGIN_TEMPLATE.replace("{{ERROR}}", alert).replace(
+        "{{USERNAME}}", html.escape(username, quote=True)
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
-    return LOGIN_PAGE.replace("{error}", "")
+    return _render_login()
 
 
 @app.post("/login")
@@ -109,12 +115,7 @@ def login(username: str = Form(...), password: str = Form(...)):
         hmac.compare_digest(username, settings.ADMIN_USERNAME)
         and hmac.compare_digest(password, settings.ADMIN_API_KEY or "")
     ):
-        return HTMLResponse(
-            LOGIN_PAGE.replace(
-                "{error}", '<div class="error">Credenciales incorrectas</div>'
-            ),
-            status_code=401,
-        )
+        return HTMLResponse(_render_login(error=True, username=username), status_code=401)
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
         SESSION_COOKIE,

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Iniciar sesión · SyncBank</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy-950:#071238;--navy-900:#0a1a4d;--navy-800:#0d2266;
+  --blue:#1d4ed8;--blue-hover:#1a44bd;--ink:#0f1b3d;--muted:#5b6785;
+  --line:#d5deef;--surface:#f4f7fd;--danger:#b42318;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--surface)}
+h1,h2,p{margin:0}
+svg{display:block;flex-shrink:0}
+.ic{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:3px solid #7aa2ff;outline-offset:2px}
+
+.login{position:relative;min-height:100vh;min-height:100dvh;overflow:hidden;
+  display:grid;grid-template-columns:59% 1fr;
+  background:
+    radial-gradient(38rem 26rem at 108% 108%,rgba(29,78,216,.07),transparent 70%),
+    radial-gradient(30rem 22rem at 96% -6%,rgba(29,78,216,.06),transparent 70%),
+    var(--surface)}
+
+/* ---------- Hero ---------- */
+.hero{position:absolute;inset:0 auto 0 0;width:59%;color:#fff;
+  clip-path:polygon(0 0,100% 0,87.5% 100%,0 100%);
+  background:
+    radial-gradient(60% 50% at 78% 44%,rgba(60,112,255,.30),transparent 70%),
+    radial-gradient(40% 40% at 8% 100%,rgba(60,112,255,.16),transparent 70%),
+    linear-gradient(162deg,var(--navy-900) 0%,var(--navy-950) 100%)}
+.hero-inner{position:relative;height:100%;display:flex;flex-direction:column;justify-content:space-between;
+  padding:clamp(28px,5.6vh,64px) clamp(28px,4.2vw,72px)}
+.brand{display:flex;align-items:center;gap:16px}
+.brand .logo{width:58px;height:58px;color:#fff}
+.brand-name{font:800 clamp(1.5rem,1.9vw,1.9rem)/1 Manrope,sans-serif;letter-spacing:-.02em}
+.brand-sub{margin-top:6px;font-size:1.05rem;color:#b9c6ea}
+.hero-copy{max-width:min(34rem,calc(29.5vw - 24px))}
+.hero-title{font:800 clamp(2rem,2.7vw,3.4rem)/1.08 Manrope,sans-serif;letter-spacing:-.03em}
+.hero-lead{max-width:30rem;margin-top:clamp(14px,2vh,22px);font-size:clamp(1rem,1.2vw,1.3rem);line-height:1.5;color:#d5def6}
+.features{list-style:none;margin:clamp(24px,4.5vh,52px) 0 0;padding:0;display:grid;gap:clamp(16px,2.6vh,28px)}
+.features li{display:flex;gap:18px;align-items:center}
+.f-icon{width:68px;height:68px;border-radius:16px;display:grid;place-items:center;
+  color:#9db8ff;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.04));
+  border:1px solid rgba(255,255,255,.12)}
+.f-icon svg{width:30px;height:30px}
+.f-title{font-weight:700;font-size:1.06rem}
+.f-text{max-width:23rem;margin-top:3px;font-size:.95rem;line-height:1.45;color:#b9c6ea}
+.hero-foot{display:flex;align-items:center;gap:14px;max-width:min(34rem,calc(29.5vw - 24px));
+  padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.92rem;color:#b9c6ea}
+.hero-foot::before{content:"";width:3px;height:26px;border-radius:2px;background:#3b82f6}
+
+/* dashboard illustration */
+.dots{position:absolute;left:55%;bottom:15%;width:11%;aspect-ratio:1;opacity:.5;
+  background:radial-gradient(rgba(255,255,255,.55) 1.4px,transparent 1.8px) 0 0/16px 16px}
+.mock{position:absolute;left:56.5%;top:17%;width:clamp(250px,21vw,400px);aspect-ratio:.86;
+  transform:perspective(1500px) rotateY(-17deg) rotateX(4deg) rotateZ(-6deg);transform-origin:50% 60%}
+.m-card{position:absolute;border-radius:18px;color:#e8eeff;
+  background:linear-gradient(150deg,rgba(255,255,255,.16),rgba(255,255,255,.05));
+  border:1px solid rgba(255,255,255,.17);box-shadow:0 30px 60px -24px rgba(0,0,0,.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.m-back{inset:0 0 28% 6%;opacity:.55;transform:translate(-4%,-6%)}
+.m-chart{inset:6% 0 32% 4%;padding:6% 7%}
+.m-chart-head{display:flex;justify-content:space-between;align-items:center;font-size:clamp(.62rem,.8vw,.85rem);color:#c9d6f8}
+.m-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:8px;
+  font-weight:700;color:#5eead4;background:rgba(45,212,191,.16)}
+.m-pill svg{width:12px;height:12px}
+.m-chart svg.chart{width:100%;height:auto;margin-top:8%}
+.m-list{inset:auto 8% 0 -3%;padding:5% 6%;display:grid;gap:4%}
+.m-row{display:flex;align-items:center;gap:14px}
+.m-row+.m-row{padding-top:4%;border-top:1px solid rgba(255,255,255,.12)}
+.m-tile{width:clamp(34px,3.2vw,54px);aspect-ratio:1;border-radius:12px;display:grid;place-items:center;
+  color:#dbe6ff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.14)}
+.m-tile svg{width:52%;height:52%}
+.m-title{font-weight:700;font-size:clamp(.72rem,.95vw,1rem)}
+.m-sub{margin-top:2px;font-size:clamp(.58rem,.75vw,.8rem);color:#aebcE6}
+.tagline{position:absolute;left:55%;bottom:7%;transform:rotate(-6deg);
+  font:600 clamp(1.4rem,1.9vw,2.1rem)/1.15 Caveat,"Segoe Script",cursive;color:#e8eeff}
+.tagline svg{width:9.5rem;height:.9rem;margin-top:.3rem;color:#3b82f6}
+
+/* ---------- Form panel ---------- */
+.panel{grid-column:2;position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;
+  min-height:100vh;min-height:100dvh;padding:clamp(20px,3.2vh,36px) clamp(20px,2.6vw,44px)}
+.help{align-self:flex-end;position:relative;font-size:.9rem;color:var(--muted)}
+.help summary,.forgot summary{list-style:none;cursor:pointer;color:var(--blue);font-weight:600;display:inline}
+.help summary::-webkit-details-marker,.forgot summary::-webkit-details-marker{display:none}
+.help summary{margin-left:6px;text-decoration:underline;text-underline-offset:3px}
+.help details{display:inline}
+.pop{position:absolute;right:0;top:calc(100% + 8px);z-index:3;width:min(19rem,80vw);padding:12px 14px;
+  font-size:.88rem;line-height:1.45;color:var(--ink);background:#fff;border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 18px 40px -16px rgba(13,34,102,.3)}
+.card{width:100%;max-width:34rem;margin:auto;padding:clamp(28px,3.4vw,48px) clamp(24px,3.6vw,56px);
+  background:#fff;border-radius:22px;
+  box-shadow:0 0 0 1px rgba(213,222,239,.7),0 36px 80px -36px rgba(13,34,102,.32)}
+.card .brand{margin-bottom:clamp(22px,4vh,40px)}
+.card .brand .logo{width:54px;height:54px;color:var(--blue)}
+.card .brand-name{color:var(--navy-900);font-size:1.7rem}
+.card .brand-sub{color:var(--muted);font-size:1rem}
+.card h1{font:800 clamp(1.7rem,2.2vw,2.2rem)/1.12 Manrope,sans-serif;letter-spacing:-.025em;color:var(--navy-900)}
+.card .lead{margin-top:8px;color:var(--muted);font-size:1.06rem}
+form{margin-top:clamp(20px,3.4vh,34px)}
+.field+.field{margin-top:22px}
+label{display:block;margin-bottom:8px;font-weight:700;font-size:1rem;color:var(--navy-900)}
+.control{position:relative}
+.control>.ic-l{position:absolute;left:16px;top:50%;width:21px;height:21px;transform:translateY(-50%);color:#7b87a6;pointer-events:none}
+input{width:100%;height:56px;padding:0 16px 0 50px;font:inherit;font-size:1.02rem;color:var(--ink);
+  background:#f8faff;border:1px solid var(--line);border-radius:12px;transition:border-color .15s,box-shadow .15s,background .15s}
+input::placeholder{color:#8b96b2}
+input:hover{border-color:#b7c5e4}
+input:focus{outline:none;background:#fff;border-color:var(--blue);box-shadow:0 0 0 4px rgba(29,78,216,.14)}
+#password{padding-right:54px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;border-radius:10px;
+  background:transparent;color:#5b6785;cursor:pointer;display:grid;place-items:center}
+.eye:hover{background:#eef2fb;color:var(--navy-900)}
+.eye svg{width:22px;height:22px}
+.eye .off{display:none}
+.eye[aria-pressed=true] .on{display:none}
+.eye[aria-pressed=true] .off{display:block}
+.forgot{margin-top:12px;text-align:right;font-size:.95rem}
+.forgot details{display:block}
+.forgot p{margin-top:8px;text-align:left;font-size:.88rem;line-height:1.45;color:var(--muted);
+  padding:10px 12px;background:var(--surface);border-radius:10px}
+.alert{margin-top:18px;padding:12px 14px;border-radius:12px;font-size:.95rem;font-weight:600;
+  color:var(--danger);background:#fef3f2;border:1px solid #fecdca}
+.submit{margin-top:22px;width:100%;height:58px;border:0;border-radius:12px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  font:700 1.1rem "DM Sans",sans-serif;color:#fff;background:var(--blue);
+  box-shadow:0 14px 28px -14px rgba(29,78,216,.75);transition:background .15s,transform .15s,box-shadow .15s}
+.submit:hover{background:var(--blue-hover);transform:translateY(-1px)}
+.submit:active{transform:none}
+.submit:disabled{opacity:.7;cursor:progress;transform:none}
+.submit svg{width:22px;height:22px}
+.secure{margin-top:26px;text-align:center;font-size:.9rem;color:var(--muted)}
+.secure-row{display:flex;align-items:center;gap:14px;color:#465274;font-weight:500}
+.secure-row::before,.secure-row::after{content:"";flex:1;height:1px;background:var(--line)}
+.secure-row svg{width:17px;height:17px;display:inline-block;vertical-align:-3px;margin-right:6px}
+.secure p{margin-top:6px;font-size:.88rem}
+.foot{align-self:flex-end;margin-top:18px;font-size:.82rem;color:#7b87a6}
+
+@media (prefers-reduced-motion:no-preference){
+  .card{animation:rise .55s cubic-bezier(.16,1,.3,1) both}
+  .hero-copy,.mock{animation:fade .8s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1300px){
+  .mock,.dots,.tagline{display:none}
+  .hero-copy,.hero-foot{max-width:min(34rem,66%)}
+}
+@media (max-width:900px){
+  .login{display:block}
+  .hero{position:relative;width:100%;clip-path:polygon(0 0,100% 0,100% calc(100% - 30px),0 100%)}
+  .hero-inner{gap:22px;padding:26px 22px 78px;justify-content:flex-start}
+  .brand .logo{width:46px;height:46px}
+  .hero-copy{max-width:none}
+  .hero-title{font-size:clamp(1.65rem,6.6vw,2.2rem)}
+  .hero-title br{display:none}
+  .hero-lead{font-size:1rem}
+  .features,.hero-foot{display:none}
+  .panel{min-height:0;margin-top:-48px;padding:0 16px 28px}
+  .card{margin:0 auto;padding:28px 22px 30px;border-radius:20px}
+  .card .brand{display:none}
+  .help{order:3;align-self:center;margin-top:20px}
+  .pop{right:50%;transform:translateX(50%)}
+  .foot{order:4;align-self:center;margin-top:8px}
+}
+@media (max-width:900px) and (max-height:700px){
+  .hero-lead{display:none}
+  .hero-inner{gap:14px;padding-top:18px;padding-bottom:64px}
+  .card{padding-top:22px;padding-bottom:24px}
+  .lead{display:none}
+  form{margin-top:16px}
+  .field+.field{margin-top:16px}
+}
+@media (max-width:380px){
+  .card{padding:24px 16px 26px}
+  input{height:54px}
+}
+@media (max-height:720px) and (min-width:901px){
+  .features{display:none}
+}
+</style>
+</head>
+<body>
+<main class="login">
+  <section class="hero" aria-label="Presentación de SyncBank">
+    <div class="hero-inner">
+      <div class="brand">
+        <svg class="logo ic" viewBox="0 0 48 48" aria-hidden="true" style="stroke-width:2.4"><circle cx="9" cy="9" r="5"/><circle cx="39" cy="9" r="5"/><circle cx="9" cy="39" r="5"/><circle cx="39" cy="39" r="5"/><path d="M14 9h20M14 39h20M9 14v20M39 14v20"/></svg>
+        <div><div class="brand-name">SyncBank</div><div class="brand-sub">Operación financiera</div></div>
+      </div>
+
+      <div class="hero-copy">
+        <p class="hero-title">Gestión financiera<br> más simple y segura</p>
+        <p class="hero-lead">Centraliza la recepción, validación y causación de tus documentos en un solo lugar.</p>
+        <ul class="features">
+          <li><span class="f-icon"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>
+            <div><div class="f-title">Control total</div><div class="f-text">Gestiona facturas, proveedores y cuentas en tiempo real.</div></div></li>
+          <li><span class="f-icon"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><rect x="3" y="11" width="4.5" height="10" rx="1.2"/><rect x="9.75" y="4" width="4.5" height="17" rx="1.2"/><rect x="16.5" y="8" width="4.5" height="13" rx="1.2"/></svg></span>
+            <div><div class="f-title">Mayor eficiencia</div><div class="f-text">Automatiza procesos y reduce tiempos de operación.</div></div></li>
+          <li><span class="f-icon"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <div><div class="f-title">Información segura</div><div class="f-text">Tus datos protegidos con los más altos estándares de seguridad.</div></div></li>
+        </ul>
+      </div>
+
+      <p class="hero-foot">Confianza, control y operación en un solo lugar.</p>
+    </div>
+
+    <div class="dots" aria-hidden="true"></div>
+    <div class="mock" aria-hidden="true">
+      <div class="m-card m-back"></div>
+      <div class="m-card m-chart">
+        <div class="m-chart-head"><span>Operación en tiempo real</span>
+          <span class="m-pill"><svg class="ic" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg>+12%</span></div>
+        <svg class="chart" viewBox="0 0 320 130" fill="none">
+          <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6" stop-opacity=".45"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0 96C22 92 34 78 52 82S86 100 106 88 132 44 158 40s30 34 54 46 44 2 66-12 30-2 42-6V130H0Z" fill="url(#ga)"/>
+          <path d="M0 96C22 92 34 78 52 82S86 100 106 88 132 44 158 40s30 34 54 46 44 2 66-12 30-2 42-6" stroke="#60a5fa" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="52" cy="82" r="4" fill="#60a5fa"/><circle cx="158" cy="40" r="5" fill="#93c5fd"/><circle cx="212" cy="86" r="4" fill="#60a5fa"/>
+        </svg>
+      </div>
+      <div class="m-card m-list">
+        <div class="m-row"><span class="m-tile"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg></span><div><div class="m-title">Facturas</div><div class="m-sub">Gestión y validación</div></div></div>
+        <div class="m-row"><span class="m-tile"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div><div class="m-title">Proveedores</div><div class="m-sub">Control de terceros</div></div></div>
+        <div class="m-row"><span class="m-tile"><svg class="ic" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m9 12 2 2 4-4"/></svg></span><div><div class="m-title">Cuentas</div><div class="m-sub">Seguimiento y conciliación</div></div></div>
+      </div>
+    </div>
+    <p class="tagline" aria-hidden="true">Operación<br>que impulsa tu negocio
+      <svg viewBox="0 0 152 14" fill="none"><path d="M2 10C40 3 96 3 150 8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></p>
+  </section>
+
+  <section class="panel">
+    <div class="help">¿Necesitas ayuda?<details><summary>Contactar soporte</summary><p class="pop">Escribe al administrador de Sync-bank y te ayudará con tu acceso.</p></details></div>
+
+    <div class="card">
+      <div class="brand">
+        <svg class="logo ic" viewBox="0 0 48 48" aria-hidden="true" style="stroke-width:2.4"><circle cx="9" cy="9" r="5"/><circle cx="39" cy="9" r="5"/><circle cx="9" cy="39" r="5"/><circle cx="39" cy="39" r="5"/><path d="M14 9h20M14 39h20M9 14v20M39 14v20"/></svg>
+        <div><div class="brand-name">SyncBank</div><div class="brand-sub">Operación financiera</div></div>
+      </div>
+      <h1>Bienvenido de nuevo</h1>
+      <p class="lead">Accede a tu cuenta para continuar</p>
+
+      <form method="post" id="login-form">
+        <div class="field">
+          <label for="username">Usuario</label>
+          <div class="control">
+            <svg class="ic ic-l" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <input id="username" name="username" type="text" value="{{USERNAME}}" placeholder="Ingresa tu usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <div class="control">
+            <svg class="ic ic-l" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input id="password" name="password" type="password" placeholder="Ingresa tu contraseña" autocomplete="current-password" required>
+            <button class="eye" type="button" id="toggle-pw" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg class="ic on" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="ic off" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="forgot"><details><summary>¿Olvidaste tu contraseña?</summary><p>El acceso lo administra el equipo de Sync-bank. Solicita el restablecimiento al administrador del sistema.</p></details></div>
+        {{ERROR}}
+        <button class="submit" type="submit" id="submit"><span>Ingresar</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+      </form>
+
+      <div class="secure">
+        <div class="secure-row"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Acceso seguro y encriptado</span></div>
+        <p>Tu información está protegida</p>
+      </div>
+    </div>
+
+    <p class="foot">SyncBank · Operación financiera · Versión 1.0.0</p>
+  </section>
+</main>
+<script>
+(function(){
+  var pw=document.getElementById('password'),eye=document.getElementById('toggle-pw'),
+      form=document.getElementById('login-form'),btn=document.getElementById('submit');
+  eye.addEventListener('click',function(){
+    var show=pw.type==='password';
+    pw.type=show?'text':'password';
+    eye.setAttribute('aria-pressed',String(show));
+    eye.setAttribute('aria-label',show?'Ocultar contraseña':'Mostrar contraseña');
+  });
+  form.addEventListener('submit',function(){
+    btn.disabled=true;btn.firstElementChild.textContent='Ingresando…';
+  });
+  window.addEventListener('pageshow',function(){
+    btn.disabled=false;btn.firstElementChild.textContent='Ingresar';
+  });
+})();
+</script>
+</body>
+</html>
