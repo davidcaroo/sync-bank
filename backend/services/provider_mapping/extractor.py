@@ -2,22 +2,31 @@ from collections import Counter
 import httpx
 
 from services.alegra_service import alegra_service
-from repositories.factura_repository import list_factura_items_by_nit
+from repositories.factura_repository import list_confirmed_provider_mappings
 from repositories.db_utils import run_in_executor
 
 
 class HistoricalExtractor:
     async def get_account_counts(self, nit_proveedor: str) -> tuple[Counter, int]:
-        rows = await run_in_executor(lambda: list_factura_items_by_nit(nit_proveedor))
+        """One vote per successfully caused invoice whose items agree on a single
+        (account, cost center) pair; mixed or unmapped invoices cast no vote."""
+        rows = await run_in_executor(
+            lambda: list_confirmed_provider_mappings(nit_proveedor)
+        )
         counter = Counter()
         total = 0
         for row in rows:
-            items = row.get("items_factura") or []
-            for item in items:
-                cuenta = item.get("cuenta_contable_alegra")
-                if cuenta:
-                    counter[str(cuenta)] += 1
-                    total += 1
+            pairs = {
+                (
+                    str(item["cuenta"]),
+                    str(item["centro_costo"]) if item.get("centro_costo") else None,
+                )
+                for item in row.get("mappings") or []
+                if item.get("cuenta")
+            }
+            if len(pairs) == 1:
+                counter[next(iter(pairs))] += 1
+                total += 1
         return counter, total
 
 
@@ -67,11 +76,18 @@ class AlegraExtractor:
                 for bill in bills:
                     purchases = bill.get("purchases") or {}
                     categories = purchases.get("categories") or []
-                    for row in categories:
-                        cuenta = row.get("id")
-                        if cuenta:
-                            counter[str(cuenta)] += 1
-                            total += 1
+                    accounts = {
+                        str(row["id"]) for row in categories if row.get("id")
+                    }
+                    if len(accounts) == 1:
+                        cost_center = (bill.get("costCenter") or {}).get("id")
+                        counter[
+                            (
+                                next(iter(accounts)),
+                                str(cost_center) if cost_center else None,
+                            )
+                        ] += 1
+                        total += 1
                     bills_seen += 1
                     if bills_seen >= max_bills:
                         return counter, total

@@ -27,17 +27,21 @@ class FakeClient:
         payload = {
             "data": [
                 {
-                    "purchases": {
-                        "categories": [{"id": "6001"}, {"id": "6001"}, {"id": "7001"}]
-                    }
-                }
+                    "costCenter": {"id": 12},
+                    "purchases": {"categories": [{"id": "6001"}, {"id": "6001"}]},
+                },
+                {
+                    "costCenter": {"id": 12},
+                    "purchases": {"categories": [{"id": "6001"}, {"id": "7001"}]},
+                },
+                {"purchases": {"categories": [{"id": "6001"}]}},
             ]
         }
         return FakeResponse(200, payload)
 
 
 @pytest.mark.asyncio
-async def test_alegra_extractor_counts_accounts(monkeypatch):
+async def test_alegra_extractor_votes_one_pair_per_bill(monkeypatch):
     monkeypatch.setattr(
         "services.provider_mapping.extractor.httpx.AsyncClient", FakeClient
     )
@@ -55,6 +59,7 @@ async def test_alegra_extractor_counts_accounts(monkeypatch):
         "9001", max_pages=1, page_size=30, max_bills=10
     )
 
-    assert total == 3
-    assert counter["6001"] == 2
-    assert counter["7001"] == 1
+    # The mixed-account bill casts no vote; the others vote once each.
+    assert total == 2
+    assert counter[("6001", "12")] == 1
+    assert counter[("6001", None)] == 1

@@ -9,6 +9,7 @@ class MappingPersistor:
         nit_proveedor: str,
         nombre_proveedor: str | None,
         cuenta: str,
+        centro_costo: str | None,
         share: float,
         source: str,
     ) -> dict | None:
@@ -17,7 +18,7 @@ class MappingPersistor:
                 nit_proveedor=nit_proveedor,
                 nombre_proveedor=nombre_proveedor,
                 id_cuenta_alegra=cuenta,
-                id_centro_costo_alegra=None,
+                id_centro_costo_alegra=centro_costo,
                 confianza=round(share, 3),
                 activo=True,
                 source=source,

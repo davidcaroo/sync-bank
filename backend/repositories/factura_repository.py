@@ -5,6 +5,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 from repositories.database import connection, transaction
+from services.provider_mapping.normalization import normalize_nit
 
 
 FACTURA_COLUMNS = (
@@ -236,18 +237,32 @@ def list_provider_nits() -> list[str]:
     return [row["nit_proveedor"] for row in rows]
 
 
-def list_factura_items_by_nit(nit_proveedor: str) -> list[dict[str, Any]]:
+def list_confirmed_provider_mappings(nit_proveedor: str) -> list[dict[str, Any]]:
+    """One row per successfully caused invoice with its item account/cost-center pairs."""
+    nit = normalize_nit(nit_proveedor)
+    if not nit:
+        return []
     with connection() as conn:
         return conn.execute(
-            """
-            select f.id, coalesce(
-                jsonb_agg(jsonb_build_object('cuenta_contable_alegra', i.cuenta_contable_alegra))
-                    filter (where i.id is not null), '[]'::jsonb
-            ) as items_factura
-            from facturas f left join items_factura i on i.factura_id = f.id
-            where f.nit_proveedor = %s group by f.id
+            r"""
+            select f.id,
+                   jsonb_agg(
+                       jsonb_build_object(
+                           'cuenta', i.cuenta_contable_alegra,
+                           'centro_costo', i.centro_costo_alegra
+                       )
+                   ) as mappings
+            from facturas f
+            join items_factura i on i.factura_id = f.id
+            where regexp_replace(coalesce(f.nit_proveedor, ''), '\D', '', 'g') = %s
+              and exists (
+                  select 1 from causaciones c
+                  where c.factura_id = f.id and c.estado = 'exitoso'
+              )
+            group by f.id
+            order by f.created_at
             """,
-            (nit_proveedor,),
+            (nit,),
         ).fetchall()
 
 

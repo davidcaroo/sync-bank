@@ -11,12 +11,13 @@ def evaluate_account_choice(
     if total <= 0 or not counter:
         return None
 
-    top_cuenta, top_count = counter.most_common(1)[0]
+    (top_cuenta, top_centro), top_count = counter.most_common(1)[0]
     share = top_count / total if total else 0.0
 
     if total >= min_occurrences and share >= min_share:
         return {
             "cuenta": str(top_cuenta),
+            "centro_costo": top_centro,
             "share": share,
             "total": total,
             "count": top_count,

@@ -114,6 +114,7 @@ class ProviderMappingService:
                     nit_proveedor=nit_proveedor,
                     nombre_proveedor=nombre_proveedor,
                     cuenta=decision["cuenta"],
+                    centro_costo=decision["centro_costo"],
                     share=decision["share"],
                     source="historical",
                 )
@@ -129,6 +130,7 @@ class ProviderMappingService:
                 return {
                     "nit": nit_proveedor,
                     "cuenta": decision["cuenta"],
+                    "centro_costo": decision["centro_costo"],
                     "confidence": decision["share"],
                     "saved": bool(saved),
                     "source": "historical",
@@ -165,6 +167,7 @@ class ProviderMappingService:
                     nit_proveedor=nit_proveedor,
                     nombre_proveedor=nombre_proveedor,
                     cuenta=decision["cuenta"],
+                    centro_costo=decision["centro_costo"],
                     share=decision["share"],
                     source="alegra",
                 )
@@ -180,6 +183,7 @@ class ProviderMappingService:
                 return {
                     "nit": nit_proveedor,
                     "cuenta": decision["cuenta"],
+                    "centro_costo": decision["centro_costo"],
                     "confidence": decision["share"],
                     "saved": bool(saved),
                     "source": "alegra",
@@ -230,6 +234,7 @@ class ProviderMappingService:
         return {
             "nit": nit_proveedor,
             "cuenta": decision["cuenta"],
+            "centro_costo": decision["centro_costo"],
             "confidence": decision["share"],
             "source": "historical_suggestion",
             "metrics": {
