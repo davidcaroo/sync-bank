@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Sidebar, Topbar } from './components/DashboardBase'
 import Dashboard from './pages/Dashboard'
 import Facturas from './pages/Facturas'
@@ -12,8 +12,15 @@ export default function App() {
   const [activeTab, setTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('syncbank-sidebar-collapsed') === 'true')
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024)
   const userName = 'Auxiliar Contable'
   const { theme, toggleTheme } = useTheme()
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => {
@@ -24,12 +31,17 @@ export default function App() {
   }
 
   const toggleSidebar = () => {
-    if (window.innerWidth < 1024) {
+    if (isMobile) {
       setSidebarOpen((prev) => !prev)
     } else {
       toggleSidebarCollapsed()
     }
   }
+
+  const sidebarExpanded = isMobile ? sidebarOpen : !sidebarCollapsed
+  const sidebarMenuLabel = isMobile
+    ? (sidebarOpen ? 'Cerrar menú lateral' : 'Abrir menú lateral')
+    : (sidebarCollapsed ? 'Expandir menú lateral' : 'Contraer menú lateral')
 
   const handleLogout = async () => {
     await fetch('/logout', { method: 'POST' })
@@ -51,6 +63,8 @@ export default function App() {
           <Topbar
             activeTab={activeTab}
             onMenu={toggleSidebar}
+            menuExpanded={sidebarExpanded}
+            menuLabel={sidebarMenuLabel}
             theme={theme}
             onToggleTheme={toggleTheme}
             userName={userName}

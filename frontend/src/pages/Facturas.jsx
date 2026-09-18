@@ -410,6 +410,13 @@ export default function Facturas() {
         </button>
       </div>
 
+      {error && (
+        <div className="ui-alert" role="alert">
+          <div><strong>No pudimos cargar las facturas.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={fetchData}>Reintentar</button>
+        </div>
+      )}
+
       {/* ── Filtros ───────────────────────────────────────────────── */}
       <div className="sb-card">
         <div className="sb-card-header">

@@ -277,6 +277,13 @@ export default function Contactos() {
         </button>
       </div>
 
+      {error && (
+        <div className="ui-alert" role="alert">
+          <div><strong>No pudimos cargar los contactos.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => fetchData(page)}>Reintentar</button>
+        </div>
+      )}
+
       {/* ── KPI Cards ─────────────────────────────────────────────── */}
       <div className="dashboard-kpi-grid kpi-grid-3">
         <KpiCard label="Total visibles" value={kpis.total} icon={Users} color="blue-500" loading={loading && rows.length === 0} />

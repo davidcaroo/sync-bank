@@ -89,21 +89,20 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const load = async () => {
+    try {
+      setError(null);
+      await Promise.all([fetchStats(), fetchRecent(), fetchStatus()]);
+    } catch {
+      setError('No se pudo cargar el dashboard.');
+      toast.error('No se pudo cargar el panel principal.');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        setError(null);
-        await Promise.all([fetchStats(), fetchRecent(), fetchStatus()]);
-      } catch {
-        setError('No se pudo cargar el dashboard.');
-        toast.error('No se pudo cargar el panel principal.');
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-
     load();
-
     // ponytail: initial dashboard load is intentionally mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -137,6 +136,14 @@ export default function Dashboard() {
           {loading ? 'Sincronizando…' : 'Sincronizar correos'}
         </button>
       </div>
+
+      {/* ── Error alert ────────────────────────────────── */}
+      {error && (
+        <div className="ui-alert" role="alert">
+          <div><strong>No pudimos actualizar el panel.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={load}>Reintentar</button>
+        </div>
+      )}
 
       {/* ── KPI Cards – 4 col grid ─────────────────────── */}
       <div className="dashboard-kpi-grid">

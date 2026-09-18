@@ -2,7 +2,7 @@
 
 ## Direction
 
-Una mesa de control financiera sobria: superficies claras cálidas, navegación azul petróleo, tipografía precisa y color semántico reservado para estados y acciones.
+Un panel administrativo profesional y minimalista: superficies blancas, navegación azul rey, tipografía precisa y color semántico reservado para estados y acciones.
 
 ## Typography
 
@@ -11,9 +11,9 @@ Una mesa de control financiera sobria: superficies claras cálidas, navegación 
 
 ## Color
 
-- Fondo marfil frío y paneles blancos para lectura prolongada.
-- Azul petróleo como estructura y verde como acción principal.
-- Ámbar, rojo y azul únicamente para estados semánticos.
+- Fondo blanco/gris muy claro y paneles blancos para lectura prolongada.
+- Azul rey como estructura (sidebar, acentos) y como acción principal.
+- Verde, ámbar y rojo únicamente para estados semánticos (éxito, alerta, error).
 
 ## Components
 

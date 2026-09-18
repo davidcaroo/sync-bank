@@ -164,6 +164,13 @@ export default function Configuracion() {
         </button>
       </div>
 
+      {error && (
+        <div className="ui-alert" role="alert">
+          <div><strong>No pudimos cargar el mapa de cuentas.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={fetchData}>Reintentar</button>
+        </div>
+      )}
+
       {/* ── Form card ────────────────────────────────────── */}
       <div className="sb-card" ref={formCardRef}>
         <div className="sb-card-header">

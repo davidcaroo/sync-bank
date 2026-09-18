@@ -64,6 +64,13 @@ export default function Logs() {
         </div>
       </div>
 
+      {error && (
+        <div className="ui-alert" role="alert">
+          <div><strong>No pudimos cargar la auditoría.</strong><span>{error}</span></div>
+          <button type="button" className="btn-secondary btn-sm" onClick={fetchData}>Reintentar</button>
+        </div>
+      )}
+
       {/* ── Filtros ───────────────────────────────────────────── */}
       <div className="audit-toolbar">
         <div className="audit-toolbar-title">

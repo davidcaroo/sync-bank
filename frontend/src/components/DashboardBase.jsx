@@ -93,7 +93,7 @@ export const Sidebar = ({ activeTab, setTab, isOpen, collapsed, onClose }) => {
 /* ================================================================
    TOPBAR
    ================================================================ */
-export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLogout }) => {
+export const Topbar = ({ activeTab, onMenu, menuExpanded, menuLabel, theme, onToggleTheme, userName, onLogout }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const userMenuRef = React.useRef(null);
@@ -137,7 +137,8 @@ export const Topbar = ({ activeTab, onMenu, theme, onToggleTheme, userName, onLo
         <button
           className="icon-btn"
           onClick={onMenu}
-          aria-label="Contraer o expandir menú lateral"
+          aria-label={menuLabel || 'Abrir o cerrar menú lateral'}
+          aria-expanded={menuExpanded}
         >
           <Menu size={18} />
         </button>
