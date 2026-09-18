@@ -1,13 +1,31 @@
 import imaplib
 import email
 import hashlib
+import logging
 from email.header import decode_header
 from config import settings
 from repositories.logs_repository import upsert_email_log
 from repositories.db_utils import run_in_executor
+from services.auto_causacion_service import auto_causacion_service
 from services.ingestion_service import ingestion_service
 from services.pdf_extraction_service import extraer_pdf_from_bytes
 from repositories.pending_document_repository import save_pending_document
+
+
+logger = logging.getLogger("email_service")
+
+
+async def _try_auto_causacion(factura_id: str, summary: dict) -> None:
+    """Opt-in autocausation; never lets a failure affect email processing."""
+    try:
+        outcome = await auto_causacion_service.try_cause_from_imap_xml(factura_id)
+    except Exception:
+        logger.exception("auto_causacion_unexpected", extra={"factura_id": factura_id})
+        return
+    if outcome.get("status") == "caused":
+        summary["auto_caused"] += 1
+    elif outcome.get("status") == "pending":
+        summary["auto_pending"] += 1
 
 
 def _decode_mime_filename(filename: str | None) -> str:
@@ -33,6 +51,8 @@ async def check_emails(search_criteria: str = "UNSEEN"):
         "xml_extracted": 0,
         "pdf_candidates": 0,
         "created": 0,
+        "auto_caused": 0,
+        "auto_pending": 0,
         "duplicates": 0,
         "invalid": 0,
         "errors": 0,
@@ -160,6 +180,10 @@ async def check_emails(search_criteria: str = "UNSEEN"):
                         status_result = result.get("status")
                         if status_result == "created":
                             summary["created"] += 1
+                            if result.get("factura_id"):
+                                await _try_auto_causacion(
+                                    str(result["factura_id"]), summary
+                                )
                         elif status_result == "duplicate":
                             summary["duplicates"] += 1
                         elif status_result == "invalid":

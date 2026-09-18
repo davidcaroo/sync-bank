@@ -18,11 +18,13 @@ from scheduler import start_scheduler
 from middleware.metrics import RequestTimingMiddleware
 from middleware.request_id import RequestIdMiddleware
 from repositories.database import close_pool, open_pool
+from repositories.schema_upgrades import apply_schema_upgrades
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     open_pool()
+    apply_schema_upgrades()
     init_telemetry()
     start_scheduler()
     try:

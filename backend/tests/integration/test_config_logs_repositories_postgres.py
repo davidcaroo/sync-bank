@@ -64,3 +64,21 @@ def test_saving_an_unchanged_rule_does_not_add_audit_rows():
         ).fetchone()["count"]
 
     assert audit_count == 1
+
+
+def test_auto_causar_defaults_to_false_and_automatic_saves_never_enable_it():
+    save_config_cuenta("900123460", "Proveedor", "5105", "12", source="historical")
+
+    assert get_config_cuenta("900123460")["auto_causar"] is False
+
+
+def test_manual_rule_can_opt_in_and_schema_upgrade_is_idempotent():
+    from repositories.schema_upgrades import apply_schema_upgrades
+
+    apply_schema_upgrades()
+    apply_schema_upgrades()
+    save_config_cuenta(
+        "900123461", "DEVISAB", "5105", "12", 1, source="manual", auto_causar=True
+    )
+
+    assert get_config_cuenta("900123461")["auto_causar"] is True

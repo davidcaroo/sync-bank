@@ -17,6 +17,7 @@ CONFIG_COLUMNS = frozenset(
         "confianza",
         "activo",
         "source",
+        "auto_causar",
     }
 )
 
@@ -136,6 +137,7 @@ def _same_rule(current: dict[str, Any], incoming: dict[str, Any]) -> bool:
             number(current["confianza"]) == number(incoming["confianza"]),
             current["activo"] == incoming["activo"],
             current["source"] == incoming["source"],
+            current["auto_causar"] == incoming["auto_causar"],
         )
     )
 
@@ -148,6 +150,7 @@ def save_config_cuenta(
     confianza: float | None = None,
     activo: bool = True,
     source: str = "auto",
+    auto_causar: bool = False,
 ) -> dict[str, Any] | None:
     """Upsert a provider rule. A manual rule is never replaced by a non-manual
     save, and the audit trail only records real changes."""
@@ -161,6 +164,7 @@ def save_config_cuenta(
         "confianza": confianza,
         "activo": activo,
         "source": source,
+        "auto_causar": auto_causar,
     }
     with transaction() as conn:
         current = conn.execute(
@@ -179,14 +183,15 @@ def save_config_cuenta(
             incoming["confianza"],
             incoming["activo"],
             incoming["source"],
+            incoming["auto_causar"],
         )
         if current is None:
             row = conn.execute(
                 """
                 insert into config_cuentas
                   (nit_proveedor, nombre_proveedor, id_cuenta_alegra,
-                   id_centro_costo_alegra, confianza, activo, source)
-                values (%s, %s, %s, %s, %s, %s, %s)
+                   id_centro_costo_alegra, confianza, activo, source, auto_causar)
+                values (%s, %s, %s, %s, %s, %s, %s, %s)
                 returning *
                 """,
                 (nit, *values),
@@ -197,7 +202,7 @@ def save_config_cuenta(
                 update config_cuentas set
                   nombre_proveedor = %s, id_cuenta_alegra = %s,
                   id_centro_costo_alegra = %s, confianza = %s, activo = %s,
-                  source = %s, updated_at = now()
+                  source = %s, auto_causar = %s, updated_at = now()
                 where id = %s
                 returning *
                 """,
@@ -206,8 +211,9 @@ def save_config_cuenta(
         conn.execute(
             """
             insert into config_cuentas_audit
-              (nit_proveedor, id_cuenta_alegra, id_centro_costo_alegra, confianza, source)
-            values (%s, %s, %s, %s, %s)
+              (nit_proveedor, id_cuenta_alegra, id_centro_costo_alegra, confianza,
+               source, auto_causar)
+            values (%s, %s, %s, %s, %s, %s)
             """,
             (
                 nit,
@@ -215,6 +221,7 @@ def save_config_cuenta(
                 id_centro_costo_alegra,
                 confianza,
                 source,
+                auto_causar,
             ),
         )
     return row

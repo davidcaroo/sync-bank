@@ -74,6 +74,7 @@ create table if not exists public.config_cuentas (
     confianza numeric(8, 6),
     activo boolean not null default true,
     source text,
+    auto_causar boolean not null default false,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
@@ -85,9 +86,14 @@ create table if not exists public.config_cuentas_audit (
     id_centro_costo_alegra text,
     confianza numeric(8, 6),
     source text,
+    auto_causar boolean not null default false,
     "user" text,
     created_at timestamptz not null default now()
 );
+alter table public.config_cuentas
+    add column if not exists auto_causar boolean not null default false;
+alter table public.config_cuentas_audit
+    add column if not exists auto_causar boolean not null default false;
 create index if not exists config_cuentas_audit_nit_idx on public.config_cuentas_audit (nit_proveedor);
 
 create table if not exists public.logs_email (
