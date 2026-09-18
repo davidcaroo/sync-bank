@@ -15,8 +15,9 @@ proveedor por su NIT y completar por defecto:
 - cero o un centro de costo de Alegra;
 - la fuente y confianza de la clasificación.
 
-La factura permanece en estado `pendiente`. Un operador abre la factura, revisa
-la clasificación y presiona **Causar en Alegra**. No habrá causación automática.
+Por defecto, la factura permanece en estado `pendiente`. Un operador abre la
+factura, revisa la clasificación y presiona **Causar en Alegra**. Sólo los
+proveedores autorizados explícitamente podrán autocausarse desde XML DIAN.
 
 ## 2. Decisiones aprobadas
 
@@ -29,7 +30,10 @@ la clasificación y presiona **Causar en Alegra**. No habrá causación automát
    repetido y consistente.
 7. El operador conserva la posibilidad de corregir cuenta y centro antes de
    causar.
-8. La acción final de causar siempre es humana.
+8. La acción final de causar es humana por defecto.
+9. La autocausación sólo se habilita manualmente por NIT y únicamente para XML
+   DIAN válido recibido por IMAP.
+10. El PDF adjunto o contenido en el ZIP es soporte; el XML es la fuente de verdad.
 
 ## 3. Casos esperados
 
@@ -42,6 +46,29 @@ factura recibe ambos valores automáticamente y queda pendiente de confirmación
 
 Una regla activa relaciona su NIT con una cuenta y un único centro de costo. El
 100 % de la factura se causa con esa clasificación.
+
+### Peaje DEVISAB
+
+Las facturas de ejemplo son emitidas por **DEVISAB S.A.S., NIT 901209021**. El
+NIT `901533793` que aparece dentro de la descripción pertenece a la unión de
+peajes y no se usa para seleccionar la regla contable.
+
+Cuando una regla manual activa para el NIT emisor tenga habilitada la
+autocausación, Sync-bank podrá causar automáticamente la factura sólo si llega
+por IMAP como XML DIAN válido, incluso cuando el XML y el PDF vengan dentro de un
+ZIP. La cuenta y el centro provienen de la regla; valor, fecha, placa y
+descripción provienen del XML de cada factura.
+
+La descripción de la partida se conserva literalmente. Para la muestra:
+
+```text
+Paso por Peaje GAMBOTE por el valor de 13.900 con la placa SMN255, el dia
+14-09-26 09:12. UT PEAJES NACIONALES NIT:901533793
+```
+
+La muestra tiene subtotal y total de COP 13.900, IVA 0 % y un solo ítem. El
+parser no puede asignar IVA 19 % por defecto cuando la línea no trae un nodo de
+impuesto.
 
 ### Proveedor conocido sólo por historial
 
@@ -69,7 +96,8 @@ marcarla como manual.
 
 ## 5. Modelo de datos
 
-No se necesitan tablas nuevas. `config_cuentas` ya contiene:
+No se necesitan tablas nuevas. Se reutiliza `config_cuentas`, conservando sus
+campos actuales y añadiendo solamente `auto_causar`:
 
 - `nit_proveedor`;
 - `nombre_proveedor`;
@@ -77,7 +105,8 @@ No se necesitan tablas nuevas. `config_cuentas` ya contiene:
 - `id_centro_costo_alegra`;
 - `confianza`;
 - `activo`;
-- `source`.
+- `source`;
+- `auto_causar`, desactivado por defecto.
 
 La pareja `(id_cuenta_alegra, id_centro_costo_alegra)` representa toda la
 clasificación de un proveedor. El centro puede ser nulo; la cuenta no.
@@ -130,7 +159,8 @@ La modal de factura mostrará claramente:
 
 El operador puede editar los valores antes de causar. El botón de causación no se
 ejecuta solo y permanece bloqueado mientras falte una cuenta. El centro de costo
-es opcional.
+es opcional, salvo en una regla de autocausación, donde cuenta y centro deben
+estar configurados.
 
 Al causar correctamente:
 
@@ -141,6 +171,30 @@ Al causar correctamente:
 Los intentos fallidos, duplicados no verificados y facturas pendientes no enseñan
 al sistema.
 
+## 8.1 Autocausación autorizada
+
+La autocausación es una excepción opt-in en `config_cuentas`, nunca una inferencia
+histórica. Para ejecutarla deben cumplirse todas estas condiciones:
+
+1. origen `IMAP + XML`; nunca PDF/OCR ni carga manual;
+2. CUFE real y número de factura presentes;
+3. NIT emisor normalizado igual al de una regla manual activa;
+4. `auto_causar = true` en esa regla;
+5. cuenta y centro de costo configurados;
+6. moneda COP, total positivo e ítems presentes;
+7. suma de líneas, subtotal, IVA, retenciones y total coherentes a un centavo;
+8. porcentaje de IVA de cada línea leído del XML; ausencia de impuesto equivale
+   a 0 %, no a 19 %;
+9. CUFE no existente y ausencia de causación exitosa previa.
+
+Si alguna condición no se cumple, la factura queda `pendiente` con el motivo y no
+se envía a Alegra. Si Alegra rechaza la autocausación, la factura vuelve a
+`pendiente` para revisión humana; el correo no se reprocesará ni se crearán
+duplicados.
+
+La descripción del ítem se envía en `purchases.categories[].observations` y se
+mantiene también en las observaciones generales ya existentes.
+
 ## 9. Configuración
 
 La pantalla “Mapa de cuentas” administrará solamente campos reales:
@@ -149,6 +203,7 @@ La pantalla “Mapa de cuentas” administrará solamente campos reales:
 - nombre del proveedor;
 - cuenta de Alegra;
 - centro de costo de Alegra;
+- autocausación desde XML, desactivada por defecto;
 - estado activo.
 
 Se eliminan del formulario los campos de retenciones que el backend no admite.
@@ -164,6 +219,9 @@ ambos nombres, la fuente y el estado.
   requiere revisión.
 - Una regla inactiva no se aplica.
 - El aprendizaje automático no sobrescribe reglas manuales.
+- El aprendizaje automático nunca habilita `auto_causar`.
+- Cambiar cuenta, centro o NIT desactiva la autocausación hasta que el operador la
+  habilite nuevamente.
 - La falta de clasificación nunca se reemplaza con una cuenta inventada.
 - La causación conserva las comprobaciones actuales de duplicado e idempotencia.
 
@@ -173,7 +231,8 @@ ambos nombres, la fuente y el estado.
 - Múltiples cuentas para una misma factura.
 - Clasificación por descripción de línea.
 - IA, embeddings o modelos predictivos.
-- Causación automática.
+- Causación automática general o aprendida desde historial.
+- Autocausación desde PDF, OCR, carga manual o proveedor no autorizado.
 - Nuevas tablas, ORM o motor genérico de reglas.
 
 ## 12. Criterios de aceptación
@@ -185,7 +244,13 @@ ambos nombres, la fuente y el estado.
 - Facturas pendientes o fallidas no afectan el aprendizaje.
 - Una factura causada con clasificación corregida guarda la corrección.
 - Un proveedor ambiguo queda pendiente de clasificación manual.
+- El ZIP de la muestra procesa el XML DIAN y no intenta interpretar su PDF como
+  fuente contable.
+- La factura de peaje conserva la descripción del XML y se envía con IVA 0 %.
+- Sólo una regla manual activa con `auto_causar = true` puede iniciar una
+  causación desde IMAP.
+- Un fallo de autocausación deja la factura pendiente y visible para revisión.
 - La pantalla de configuración crea y edita cuenta y centro sin enviar campos no
   soportados.
-- La factura nunca se causa sin una acción explícita del operador.
-
+- Toda factura no autorizada para autocausación requiere una acción explícita del
+  operador.
