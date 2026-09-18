@@ -19,6 +19,7 @@ import {
   updateConfigCuenta,
 } from '../lib/api'
 import { buildConfigPayload, withClassificationChange } from '../lib/configPayload'
+import { activeCostCenters, isActiveCostCenter } from '../lib/costCenters'
 import { useToast } from '../components/ToastProvider'
 
 const emptyForm = {
@@ -65,12 +66,15 @@ export default function Configuracion() {
     }
   }, [catalogo.categories])
 
+  const activeCenters = useMemo(() => activeCostCenters(catalogo.cost_centers), [catalogo.cost_centers])
+
   const centerLabel = useMemo(() => {
     const byId = new Map(catalogo.cost_centers.map((item) => [String(item.id), item]))
     return (id) => {
       if (!id) return 'Sin centro'
       const item = byId.get(String(id))
-      return item ? `${item.id} | ${item.name}` : `${id} (registrado)`
+      if (!item) return `${id} (registrado)`
+      return `${item.id} | ${item.name}${isActiveCostCenter(item) ? '' : ' (inactivo)'}`
     }
   }, [catalogo.cost_centers])
 
@@ -169,8 +173,8 @@ export default function Configuracion() {
   const canAutoCausar = Boolean(form.id_cuenta_alegra && form.id_centro_costo_alegra)
   const accountMissingFromCatalog = form.id_cuenta_alegra
     && !catalogo.categories.some((item) => String(item.id) === String(form.id_cuenta_alegra))
-  const centerMissingFromCatalog = form.id_centro_costo_alegra
-    && !catalogo.cost_centers.some((item) => String(item.id) === String(form.id_centro_costo_alegra))
+  const centerNotSelectable = form.id_centro_costo_alegra
+    && !activeCenters.some((item) => String(item.id) === String(form.id_centro_costo_alegra))
 
   return (
     <div className="page-shell">
@@ -274,10 +278,10 @@ export default function Configuracion() {
                 onChange={(e) => setClassification('id_centro_costo_alegra', e.target.value)}
               >
                 <option value="">Sin centro de costo</option>
-                {centerMissingFromCatalog && (
+                {centerNotSelectable && (
                   <option value={form.id_centro_costo_alegra}>{centerLabel(form.id_centro_costo_alegra)}</option>
                 )}
-                {catalogo.cost_centers.map((item) => (
+                {activeCenters.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.id} | {item.name}
                   </option>

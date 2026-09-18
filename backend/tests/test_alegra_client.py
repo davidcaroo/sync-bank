@@ -286,3 +286,28 @@ async def test_bill_payload_carries_item_description_and_no_tax_for_zero_iva():
     category = http.posted["purchases"]["categories"][0]
     assert category["observations"] == PEAJE_DESCRIPTION
     assert "tax" not in category
+
+
+def test_flatten_categories_skips_blocked_and_accumulative_accounts():
+    client = AlegraClient()
+    payload = [
+        {
+            "id": "5068",
+            "code": "5",
+            "name": "Egresos",
+            "status": "active",
+            "use": "accumulative",
+            "blocked": "yes",
+            "readOnly": True,
+            "children": [
+                {"id": "5298", "code": "61450502", "name": "Peajes", "status": "active", "use": "movement", "blocked": "no"},
+                {"id": "5300", "name": "Cuenta de grupo", "status": "active", "use": "accumulative", "blocked": "no"},
+                {"id": "5301", "name": "Cuenta bloqueada", "status": "active", "use": "movement", "blocked": "yes"},
+                {"id": "5302", "name": "Sin marcas", "status": "active"},
+            ],
+        }
+    ]
+
+    ids = {str(item["id"]) for item in client._flatten_categories(payload)}
+
+    assert ids == {"5298", "5302"}

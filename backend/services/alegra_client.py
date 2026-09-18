@@ -43,6 +43,15 @@ def _to_float(value, default: float = 0.0) -> float:
         return default
 
 
+def _is_selectable_category(node: dict) -> bool:
+    """Alegra rejects movements on blocked or accumulative (group) accounts."""
+    if str(node.get("status") or "").lower() == "inactive":
+        return False
+    if str(node.get("blocked") or "").lower() in {"yes", "true"}:
+        return False
+    return str(node.get("use") or "").lower() != "accumulative"
+
+
 def _extract_contact_id_from_error_payload(payload) -> str | None:
     if isinstance(payload, dict):
         for key in ("contactId", "contact_id", "id"):
@@ -235,9 +244,8 @@ class AlegraClient:
             category_id = node.get("id")
             name = node.get("name") or node.get("text")
             code = node.get("code")
-            status = node.get("status")
 
-            if category_id and name and status != "inactive":
+            if category_id and name and _is_selectable_category(node):
                 result.append(
                     {
                         "id": category_id,
