@@ -92,14 +92,14 @@ class IngestionProcessor:
             if config:
                 cuenta_to_save = config.get("id_cuenta_alegra")
                 centro_to_save = config.get("id_centro_costo_alegra")
-                prefill_source = "config"
+                prefill_source = config.get("source") or "config"
                 try:
                     confidence = float(config.get("confianza") or 1.0)
                 except Exception:
                     confidence = 1.0
             elif historical_hint and historical_hint.get("cuenta"):
                 cuenta_to_save = historical_hint.get("cuenta")
-                centro_to_save = None
+                centro_to_save = historical_hint.get("centro_costo")
                 prefill_source = "historical"
                 try:
                     confidence = float(historical_hint.get("confidence") or 0.0)

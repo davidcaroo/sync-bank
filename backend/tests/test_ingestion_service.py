@@ -89,3 +89,94 @@ async def test_ingestion_prefills_with_config(monkeypatch):
 
     items = result["factura_preview"]["items"]
     assert items[0]["cuenta_contable_alegra"] == "5001"
+
+
+def _patch_common(monkeypatch, config):
+    async def fake_run_in_executor(action):
+        return action()
+
+    monkeypatch.setattr(
+        "services.ingestion_service.parse_xml_dian", lambda _: DummyFactura()
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.run_in_executor", fake_run_in_executor
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.get_config_cuenta", lambda nit: config
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.sync_config_proveedor_nombre",
+        lambda nit, nombre: None,
+    )
+    monkeypatch.setattr(
+        "services.ingestion_service.find_factura_by_cufe", lambda cufe: None
+    )
+
+
+async def _preview_items():
+    xml_doc = XMLDocument(file_name="x.xml", entry_name="x.xml", xml_text="<xml/>")
+    result = await IngestionService().process_xml_document(
+        xml_doc, persist=False, apply_ai=False, categories=[], cost_centers=[]
+    )
+    return result["factura_preview"]["items"]
+
+
+@pytest.mark.asyncio
+async def test_manual_rule_prefills_account_and_cost_center(monkeypatch):
+    _patch_common(
+        monkeypatch,
+        {
+            "id_cuenta_alegra": "5105",
+            "id_centro_costo_alegra": "12",
+            "source": "manual",
+            "confianza": 1,
+        },
+    )
+
+    item = (await _preview_items())[0]
+
+    assert item["cuenta_contable_alegra"] == "5105"
+    assert item["centro_costo_alegra"] == "12"
+    assert item["prefill_source"] == "manual"
+    assert item["confidence"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_historical_suggestion_prefills_account_and_cost_center(monkeypatch):
+    _patch_common(monkeypatch, None)
+
+    async def fake_suggestion(*args, **kwargs):
+        return {"cuenta": "5105", "centro_costo": "12", "confidence": 0.75}
+
+    monkeypatch.setattr(
+        "services.provider_mapping_service.provider_mapping_service."
+        "suggest_mapping_from_history",
+        fake_suggestion,
+    )
+
+    item = (await _preview_items())[0]
+
+    assert item["cuenta_contable_alegra"] == "5105"
+    assert item["centro_costo_alegra"] == "12"
+    assert item["prefill_source"] == "historical"
+    assert item["confidence"] == 0.75
+
+
+@pytest.mark.asyncio
+async def test_unmapped_provider_gets_no_invented_classification(monkeypatch):
+    _patch_common(monkeypatch, None)
+
+    async def no_suggestion(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "services.provider_mapping_service.provider_mapping_service."
+        "suggest_mapping_from_history",
+        no_suggestion,
+    )
+
+    item = (await _preview_items())[0]
+
+    assert item["cuenta_contable_alegra"] is None
+    assert item["centro_costo_alegra"] is None
+    assert item["prefill_source"] == "none"
