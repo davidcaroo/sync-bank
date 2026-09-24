@@ -1,7 +1,7 @@
 from datetime import date
 
 from config import settings
-from services.provider_mapping.normalization import normalize_nit
+from services.provider_mapping.normalization import nit_key
 from services.ingestion.contracts import (
     FacturaRepositoryPort,
     ProviderConfigRepositoryPort,
@@ -22,8 +22,8 @@ class IngestionProcessor:
 
     @staticmethod
     def _receiver_rejection(factura) -> str | None:
-        company = normalize_nit(settings.COMPANY_NIT)
-        receptor = normalize_nit(factura.nit_receptor)
+        company = nit_key(settings.COMPANY_NIT)
+        receptor = nit_key(factura.nit_receptor)
         if not company:
             return "COMPANY_NIT no configurado (company_nit_not_configured)."
         if not receptor:

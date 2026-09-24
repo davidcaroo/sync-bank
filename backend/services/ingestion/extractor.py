@@ -131,9 +131,15 @@ class IngestionExtractor:
         *,
         path: str,
         depth: int,
+        budget: dict | None = None,
     ) -> tuple[list[XMLDocument], list[dict]]:
         documents: list[XMLDocument] = []
         errors: list[dict] = []
+        if budget is None:
+            budget = {
+                "entries": settings.MAX_ZIP_ENTRIES,
+                "bytes": settings.MAX_ZIP_EXPANDED_BYTES,
+            }
 
         if depth > 3:
             return documents, [
@@ -147,7 +153,7 @@ class IngestionExtractor:
 
         try:
             with zipfile.ZipFile(io.BytesIO(content)) as zipped:
-                problem = self._zip_problem(zipped.infolist())
+                problem = self._zip_problem(zipped.infolist(), budget)
                 if problem:
                     return documents, [
                         {
@@ -187,6 +193,7 @@ class IngestionExtractor:
                                     entry_bytes,
                                     path=nested_path,
                                     depth=depth + 1,
+                                    budget=budget,
                                 )
                             )
                             documents.extend(nested_docs)
@@ -213,13 +220,15 @@ class IngestionExtractor:
         return documents, errors
 
     @staticmethod
-    def _zip_problem(infos) -> str | None:
-        """Checked from ZIP metadata alone, before decompressing anything."""
-        if len(infos) > settings.MAX_ZIP_ENTRIES:
+    def _zip_problem(infos, budget: dict) -> str | None:
+        """Checked from ZIP metadata alone, before decompressing anything. The budget
+        is shared with nested archives so limits hold for the whole attachment."""
+        if len(infos) > budget["entries"]:
             return "ZIP con demasiadas entradas."
         if any(info.flag_bits & 0x1 for info in infos):
             return "ZIP cifrado no soportado."
-        if sum(info.file_size for info in infos) > settings.MAX_ZIP_EXPANDED_BYTES:
+        expanded = sum(info.file_size for info in infos)
+        if expanded > budget["bytes"]:
             return "ZIP excede el tamano maximo descomprimido."
         for info in infos:
             if info.file_size and (
@@ -228,6 +237,8 @@ class IngestionExtractor:
                 > settings.MAX_ZIP_COMPRESSION_RATIO
             ):
                 return "ZIP con relacion de compresion sospechosa."
+        budget["entries"] -= len(infos)
+        budget["bytes"] -= expanded
         return None
 
     @staticmethod

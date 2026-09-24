@@ -254,3 +254,11 @@ def test_parsed_peaje_invoice_passes_the_guard_with_a_devisab_rule(monkeypatch):
     decision = evaluate_auto_causacion(factura, VALID_CONFIG)
 
     assert decision.eligible, decision.reason
+
+
+def test_autocausation_accepts_the_company_nit_with_a_verification_digit(monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "COMPANY_NIT", "900741732-1")
+
+    assert evaluate_auto_causacion(VALID_FACTURA, VALID_CONFIG).eligible

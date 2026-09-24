@@ -119,3 +119,14 @@ def test_cookie_is_signed_with_session_secret_not_the_admin_key(monkeypatch):
     assert main._valid_session(token)
     monkeypatch.setattr(main.settings, "SESSION_SECRET", "rotated-secret")
     assert not main._valid_session(token)
+
+
+def test_production_refuses_to_start_without_the_company_nit(monkeypatch):
+    import pytest
+    from config import settings, validate_security_settings
+
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "SESSION_SECRET", "s")
+    monkeypatch.setattr(settings, "COMPANY_NIT", None)
+    with pytest.raises(RuntimeError):
+        validate_security_settings()

@@ -287,3 +287,27 @@ async def test_a_formatted_receiver_nit_is_normalized_before_comparing(monkeypat
 
     with pytest.raises(Boom):
         await _ingest(processor)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "receptor,company",
+    [("900741732", "900741732-1"), ("900.741.732-1", "900741732")],
+)
+async def test_a_verification_digit_on_either_side_does_not_reject_the_company(
+    receptor, company, monkeypatch
+):
+    processor = _receiver_processor(receptor, monkeypatch, company)
+
+    class Boom(Exception):
+        pass
+
+    async def stop(*args, **kwargs):
+        raise Boom()
+
+    processor._provider_config_repository = type(
+        "P", (), {"sync_proveedor_nombre": staticmethod(stop)}
+    )()
+
+    with pytest.raises(Boom):
+        await _ingest(processor)

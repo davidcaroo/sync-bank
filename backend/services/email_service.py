@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import imaplib
 import email
@@ -107,10 +108,14 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
     try:
         prefill_context = await ingestion_service.build_prefill_context(apply_ai=False)
 
-        mail = imaplib.IMAP4_SSL(settings.IMAP_HOST, settings.IMAP_PORT)
-        mail.login(settings.IMAP_USER, settings.IMAP_PASS)
+        mail = await asyncio.to_thread(
+            imaplib.IMAP4_SSL, settings.IMAP_HOST, settings.IMAP_PORT
+        )
+        await asyncio.to_thread(mail.login, settings.IMAP_USER, settings.IMAP_PASS)
         mailbox = (settings.IMAP_MAILBOX or "").strip() or "inbox"
-        select_status, _ = mail.select(_mailbox_arg(mailbox))
+        select_status, _ = await asyncio.to_thread(
+            mail.select, _mailbox_arg(mailbox)
+        )
         if select_status != "OK":
             summary["errors"] += 1
             summary["fatal_error"] = f"No se pudo abrir la carpeta o etiqueta '{mailbox}'"
@@ -129,12 +134,14 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                 }
             )
             try:
-                mail.logout()
+                await asyncio.to_thread(mail.logout)
             except Exception:
                 pass
             return summary
 
-        status, messages = mail.search(None, search_criteria)
+        status, messages = await asyncio.to_thread(
+            mail.search, None, search_criteria
+        )
         found_messages = len(messages[0].split())
         summary["messages_found"] = found_messages
         print(f"IMAP Search: {status}, found {found_messages} messages")
@@ -144,7 +151,7 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
             return summary
 
         for num in messages[0].split():
-            status, data = mail.fetch(num, "(RFC822)")
+            status, data = await asyncio.to_thread(mail.fetch, num, "(RFC822)")
             print(f"Fetching message {num}... status: {status}")
             if status != "OK":
                 summary["errors"] += 1
@@ -182,8 +189,10 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                     continue
 
                 has_relevant_attachment = True
-                extracted = ingestion_service.extract_xml_documents_from_attachment(
-                    filename, content
+                extracted = await asyncio.to_thread(
+                    ingestion_service.extract_xml_documents_from_attachment,
+                    filename,
+                    content,
                 )
                 documents = extracted.get("documents") or []
                 extract_errors = extracted.get("errors") or []
@@ -198,7 +207,6 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                 summary["xml_extracted"] += len(documents)
 
                 if extract_errors:
-                    has_errors = True
                     summary["invalid"] += len(extract_errors)
                     for err in extract_errors:
                         print(
@@ -238,7 +246,6 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                             summary["out_of_range"] += 1
                         elif status_result == "invalid":
                             summary["invalid"] += 1
-                            has_errors = True
                             summary["invalid_details"].append(
                                 {
                                     "source": "parser",
@@ -285,9 +292,9 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
 
             # Keep retry for real processing errors; ignore non-processable emails.
             if email_log["estado"] in {"procesado", "ignorado"}:
-                mail.store(num, "+FLAGS", "\\Seen")
+                await asyncio.to_thread(mail.store, num, "+FLAGS", "\\Seen")
 
-        mail.logout()
+        await asyncio.to_thread(mail.logout)
         return summary
     except Exception as e:
         print(f"IMAP Error: {e}")

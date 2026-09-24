@@ -124,3 +124,35 @@ def test_an_oversized_attachment_is_rejected(monkeypatch):
     result = extract("huge.xml", b"<a/>" + b" " * 200)
 
     assert result["documents"] == [] and "tamano" in reasons(result).lower()
+
+
+def test_zip_limits_are_shared_across_nested_archives(monkeypatch):
+    monkeypatch.setattr(settings, "MAX_ZIP_ENTRIES", 4)
+    inner = make_zip({f"{i}.xml": INVOICE for i in range(3)})
+
+    result = extract("outer.zip", make_zip({"a.zip": inner, "b.zip": inner}))
+
+    assert result["documents"] == [] and "entradas" in reasons(result).lower()
+
+
+def test_a_namespaced_invoice_is_found_even_after_an_event_in_the_same_file():
+    fe_invoice = (
+        f'<fe:Invoice xmlns:fe="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" '
+        f'xmlns:cbc="{CBC}"><cbc:ID>F9</cbc:ID></fe:Invoice>'
+    )
+
+    def attachment(inner):
+        return (
+            "<cac:Attachment><cac:ExternalReference><cbc:Description>"
+            f"<![CDATA[{inner}]]></cbc:Description></cac:ExternalReference></cac:Attachment>"
+        )
+
+    xml = (
+        '<AttachedDocument xmlns="urn:oasis:names:specification:ubl:schema:xsd:AttachedDocument-2" '
+        f'xmlns:cac="{CAC}" xmlns:cbc="{CBC}">{attachment(EVENT)}{attachment(fe_invoice)}'
+        "</AttachedDocument>"
+    )
+
+    result = extract("f.xml", xml.encode())
+
+    assert len(result["documents"]) == 1 and result["errors"] == []

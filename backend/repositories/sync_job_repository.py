@@ -84,8 +84,10 @@ def retry_or_fail_job(job_id, error: str) -> str:
     return row["status"]
 
 
-def recover_interrupted_jobs() -> int:
-    """Jobs left 'running' by a restart: requeue them or fail them if out of attempts."""
+def recover_interrupted_jobs(stale_seconds: int = 300) -> int:
+    """Jobs 'running' with no heartbeat (progress write) for `stale_seconds`, i.e. left
+    behind by a restart: requeue them or fail them if out of attempts. A job that a
+    live instance is still working on keeps updating updated_at and is left alone."""
     with transaction() as conn:
         rows = conn.execute(
             """
@@ -94,9 +96,10 @@ def recover_interrupted_jobs() -> int:
                 finished_at = case when attempts < max_attempts then null else now() end,
                 error_message = 'Trabajo interrumpido por un reinicio del servicio'
             where job_type = %s and status = 'running'
+              and updated_at < now() - make_interval(secs => %s)
             returning id
             """,
-            (JOB_TYPE,),
+            (JOB_TYPE, stale_seconds),
         ).fetchall()
     return len(rows)
 

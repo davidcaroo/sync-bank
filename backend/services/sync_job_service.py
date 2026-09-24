@@ -76,9 +76,9 @@ async def recover() -> None:
 
 
 async def _loop() -> None:
-    await recover()
     while True:
         try:
+            await recover()
             await run_pending()
         except Exception:
             logger.exception("sync_runner_failed")

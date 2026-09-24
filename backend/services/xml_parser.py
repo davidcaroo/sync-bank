@@ -110,21 +110,19 @@ class DIANParser:
         if not description_nodes:
             return tree
 
-        try:
-            embedded_xml = ""
-            for node in description_nodes:
-                candidate = (node.text or "").strip()
-                if "<Invoice" in candidate:
-                    embedded_xml = candidate
-                    break
-            if not embedded_xml and description_nodes[0].text:
-                embedded_xml = description_nodes[0].text
-            if embedded_xml and "<" in embedded_xml:
-                return etree.fromstring(embedded_xml.encode("utf-8"))
-        except (XMLSyntaxError, ValueError):
-            return tree
-
-        return tree
+        embedded = []
+        for node in description_nodes:
+            candidate = (node.text or "").strip()
+            if "<" not in candidate:
+                continue
+            try:
+                embedded.append(etree.fromstring(candidate.encode("utf-8")))
+            except (XMLSyntaxError, ValueError):
+                continue
+        for root in embedded:
+            if etree.QName(root).localname == "Invoice":
+                return root
+        return embedded[0] if embedded else tree
 
     def _get_text(self, tree, xpath: str, default: str = "") -> str:
         result = tree.xpath(xpath, namespaces=self.namespaces)

@@ -13,7 +13,7 @@ from repositories.factura_async_repository import (
 )
 from repositories.ingestion_adapters import SyncProviderConfigRepositoryAdapter
 from services.factura_service import factura_service
-from services.provider_mapping.normalization import normalize_nit
+from services.provider_mapping.normalization import nit_key, normalize_nit
 
 CENT = Decimal("0.01")
 BLOCKED_ESTADO = "autocausacion_bloqueada"
@@ -54,8 +54,8 @@ def evaluate_auto_causacion(
         config.get("nit_proveedor")
     ):
         return AutoCausacionDecision(False, "nit_mismatch")
-    company = normalize_nit(settings.COMPANY_NIT)
-    if not company or normalize_nit(factura.get("nit_receptor")) != company:
+    company = nit_key(settings.COMPANY_NIT)
+    if not company or nit_key(factura.get("nit_receptor")) != company:
         return AutoCausacionDecision(False, "receiver_nit_mismatch")
     if not factura.get("xml_raw"):
         return AutoCausacionDecision(False, "not_xml")

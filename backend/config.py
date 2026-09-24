@@ -48,10 +48,10 @@ settings = Settings()
 
 def validate_security_settings() -> None:
     if settings.APP_ENV == "production" and not (
-        settings.ADMIN_API_KEY and settings.SESSION_SECRET
+        settings.ADMIN_API_KEY and settings.SESSION_SECRET and settings.COMPANY_NIT
     ):
         raise RuntimeError(
-            "En produccion ADMIN_API_KEY y SESSION_SECRET son obligatorias"
+            "En produccion ADMIN_API_KEY, SESSION_SECRET y COMPANY_NIT son obligatorias"
         )
 
 

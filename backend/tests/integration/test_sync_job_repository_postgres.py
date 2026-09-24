@@ -90,16 +90,34 @@ def test_a_job_is_retried_up_to_three_attempts_then_fails_with_the_last_error():
     assert claim_next_email_sync() is None
 
 
+def _make_stale(job_id):
+    with transaction() as conn:
+        conn.execute(
+            "update sync_jobs set updated_at = now() - interval '10 minutes' where id = %s",
+            (job_id,),
+        )
+
+
+def test_a_job_with_a_recent_heartbeat_is_not_taken_from_a_live_instance():
+    enqueue_email_sync("manual")
+    claim_next_email_sync()
+
+    assert recover_interrupted_jobs() == 0
+    assert get_sync_status()["status"] == "running"
+
+
 def test_jobs_left_running_by_a_restart_go_back_to_the_queue_or_fail():
     job = enqueue_email_sync("manual")["job"]
     claim_next_email_sync()
+    _make_stale(job["id"])
 
     assert recover_interrupted_jobs() == 1
     assert get_sync_status()["status"] == "pending"
 
     with transaction() as conn:
         conn.execute(
-            "update sync_jobs set status = 'running', attempts = 3 where id = %s",
+            "update sync_jobs set status = 'running', attempts = 3,"
+            " updated_at = now() - interval '10 minutes' where id = %s",
             (job["id"],),
         )
     assert recover_interrupted_jobs() == 1

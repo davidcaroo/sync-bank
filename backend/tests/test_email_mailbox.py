@@ -203,3 +203,83 @@ async def test_dian_events_are_counted_as_ignored_and_the_mail_is_marked_read(mo
     assert summary["ignored"] == 1
     assert summary["invalid"] == 0 and summary["errors"] == 0
     assert logs[0]["estado"] == "ignorado"
+
+
+class CreditNoteImap(OneMessageImap):
+    def fetch(self, num, parts):
+        from email.message import EmailMessage
+
+        from tests.test_extractor_safety import CREDIT_NOTE, make_zip
+
+        msg = EmailMessage()
+        msg["Message-ID"] = "<nc@x>"
+        msg["From"] = "no-responder@facture.co"
+        msg["Subject"] = "Nota credito"
+        msg.set_content("adjunto")
+        msg.add_attachment(
+            make_zip({"nc.xml": CREDIT_NOTE}),
+            maintype="application",
+            subtype="zip",
+            filename="nc.zip",
+        )
+        return "OK", [(b"1", msg.as_bytes())]
+
+
+@pytest.mark.asyncio
+async def test_a_deterministically_rejected_mail_is_marked_read_not_retried_forever(
+    monkeypatch,
+):
+    instances = []
+
+    class Tracked(CreditNoteImap):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            instances.append(self)
+
+    async def no_context(*, apply_ai):
+        return {}
+
+    monkeypatch.setattr(email_service.imaplib, "IMAP4_SSL", Tracked)
+    monkeypatch.setattr(
+        email_service.ingestion_service, "build_prefill_context", no_context
+    )
+    monkeypatch.setattr(email_service, "upsert_email_log", lambda log: None)
+
+    summary = await email_service.check_emails()
+
+    assert summary["invalid"] == 1
+    assert instances[0].seen == [b"1"]
+
+
+@pytest.mark.asyncio
+async def test_imap_work_runs_off_the_event_loop_thread(monkeypatch):
+    import threading
+
+    main_thread = threading.get_ident()
+    threads = []
+
+    class Spy(OneMessageImap):
+        def login(self, user, password):
+            threads.append(threading.get_ident())
+            return super().login(user, password)
+
+        def search(self, charset, criteria):
+            threads.append(threading.get_ident())
+            return super().search(charset, criteria)
+
+        def fetch(self, num, parts):
+            threads.append(threading.get_ident())
+            return super().fetch(num, parts)
+
+    async def no_context(*, apply_ai):
+        return {}
+
+    monkeypatch.setattr(email_service.imaplib, "IMAP4_SSL", Spy)
+    monkeypatch.setattr(
+        email_service.ingestion_service, "build_prefill_context", no_context
+    )
+    monkeypatch.setattr(email_service, "upsert_email_log", lambda log: None)
+
+    await email_service.check_emails()
+
+    assert threads and all(t != main_thread for t in threads)

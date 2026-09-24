@@ -20,7 +20,7 @@ from services.alegra_service import alegra_service
 from services.errors import AlegraDuplicateBillError, RemoteAPIError
 from services.ingestion_service import ingestion_service
 from services.provider_mapping_service import provider_mapping_service
-from services.provider_mapping.normalization import normalize_nit
+from services.provider_mapping.normalization import nit_key
 from services.timezone_service import now_bogota, to_bogota
 from services.xml_parser import parse_xml_dian
 
@@ -492,8 +492,8 @@ class FacturaService:
         if not factura_data:
             raise HTTPException(status_code=404, detail="Factura no encontrada")
 
-        receptor = normalize_nit(factura_data.get("nit_receptor"))
-        company = normalize_nit(settings.COMPANY_NIT)
+        receptor = nit_key(factura_data.get("nit_receptor"))
+        company = nit_key(settings.COMPANY_NIT)
         # 123456789 is the parser's placeholder when the invoice has no receptor NIT.
         if company and receptor not in {"", "123456789", company}:
             raise HTTPException(
