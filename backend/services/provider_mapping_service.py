@@ -199,7 +199,7 @@ class ProviderMappingService:
         self,
         nit_proveedor: str,
         *,
-        min_occurrences: int = 2,
+        min_occurrences: int = 1,
         min_share: float = 0.6,
     ) -> Optional[dict]:
         """Return a non-persistent historical suggestion for a provider.

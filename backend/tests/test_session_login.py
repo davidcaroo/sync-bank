@@ -57,3 +57,45 @@ def test_wrong_credentials_show_an_error_and_keep_the_escaped_username(monkeypat
     assert 'role="alert"' in response.text and "Credenciales incorrectas" in response.text
     assert "<script>x</script>" not in response.text
     assert "&lt;script&gt;x&lt;/script&gt;" in response.text
+
+
+def _fake_google(monkeypatch, email, verified=True):
+    import base64
+    import json
+
+    claims = base64.urlsafe_b64encode(
+        json.dumps({"email": email, "email_verified": verified}).encode()
+    ).decode()
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"id_token": f"h.{claims}.s"}
+
+    monkeypatch.setattr(main.httpx, "post", lambda *a, **k: Resp())
+    monkeypatch.setattr(main.settings, "GOOGLE_CLIENT_ID", "cid")
+    monkeypatch.setattr(main.settings, "GOOGLE_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(main.settings, "IMAP_USER", "Facturas@Gmail.com")
+
+
+def test_google_login_allows_the_invoice_mailbox_and_shows_button(monkeypatch):
+    _fake_google(monkeypatch, "facturas@gmail.com")
+    with _client(monkeypatch) as client:
+        assert "Continuar con Google" in client.get("/login").text
+        start = client.get("/login/google")
+        assert start.headers["location"].startswith("https://accounts.google.com/")
+        state = client.cookies.get("syncbank_oauth_state")
+        done = client.get(f"/login/google/callback?code=abc&state={state}")
+        assert done.status_code == 303
+        assert client.get("/").status_code == 200
+
+
+def test_google_login_rejects_other_emails_and_bad_state(monkeypatch):
+    _fake_google(monkeypatch, "intruso@gmail.com")
+    with _client(monkeypatch) as client:
+        client.get("/login/google")
+        state = client.cookies.get("syncbank_oauth_state")
+        assert client.get(f"/login/google/callback?code=a&state={state}").status_code == 403
+        assert client.get("/login/google/callback?code=a&state=wrong").status_code == 401

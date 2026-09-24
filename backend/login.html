@@ -137,6 +137,9 @@ input:focus{outline:none;background:#fff;border-color:var(--blue);box-shadow:0 0
 .submit:active{transform:none}
 .submit:disabled{opacity:.7;cursor:progress;transform:none}
 .submit svg{width:22px;height:22px}
+.google{margin-top:14px;width:100%;height:56px;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:12px;font:600 1.02rem "DM Sans",sans-serif;color:var(--ink);background:#fff;text-decoration:none}
+.google:hover{background:#f8faff;border-color:#b7c5e4}
+.google b{font:800 1.25rem Manrope,sans-serif;color:#4285f4}
 .secure{margin-top:26px;text-align:center;font-size:.9rem;color:var(--muted)}
 .secure-row{display:flex;align-items:center;gap:14px;color:#465274;font-weight:500}
 .secure-row::before,.secure-row::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -272,6 +275,7 @@ input:focus{outline:none;background:#fff;border-color:var(--blue);box-shadow:0 0
         {{ERROR}}
         <button class="submit" type="submit" id="submit"><span>Ingresar</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
       </form>
+      {{GOOGLE}}
 
       <div class="secure">
         <div class="secure-row"><span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Acceso seguro y encriptado</span></div>

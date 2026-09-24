@@ -61,3 +61,14 @@ async def test_history_suggestion_returns_cost_center():
 
     assert suggestion["cuenta"] == "5105"
     assert suggestion["centro_costo"] == "12"
+
+
+@pytest.mark.asyncio
+async def test_history_suggestion_works_with_one_prior_causation():
+    service = ProviderMappingService()
+    service._historical = DummyExtractor(Counter({("5105", "12"): 1}), 1)
+
+    suggestion = await service.suggest_mapping_from_history("900123456")
+
+    assert suggestion["cuenta"] == "5105"
+    assert suggestion["centro_costo"] == "12"

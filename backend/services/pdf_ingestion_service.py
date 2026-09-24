@@ -103,7 +103,7 @@ class PdfIngestionService:
                     historical_hint = (
                         await provider_mapping_service.suggest_mapping_from_history(
                             factura.nit_proveedor,
-                            min_occurrences=2,
+                            min_occurrences=1,
                             min_share=0.6,
                         )
                     )
@@ -118,7 +118,7 @@ class PdfIngestionService:
                         historical_hint = (
                             await provider_mapping_service.suggest_mapping_from_history(
                                 factura.nit_proveedor,
-                                min_occurrences=2,
+                                min_occurrences=1,
                                 min_share=0.6,
                             )
                         )

@@ -4,15 +4,18 @@ import json
 import base64
 import hmac
 import hashlib
+import secrets
 import time
+from urllib.parse import urlencode
 from contextlib import asynccontextmanager
 from pathlib import Path
+import httpx
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from config import settings
+from config import google_allowed_emails, settings
 from observability.telemetry import init_telemetry
 from routers import facturas, proceso, config, logs, contactos, providers
 from scheduler import start_scheduler
@@ -36,12 +39,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sync-bank API", lifespan=lifespan)
 
+GOOGLE_PATHS = {"/login/google", "/login/google/callback"}
+GOOGLE_STATE_COOKIE = "syncbank_oauth_state"
 SESSION_COOKIE = "syncbank_session"
 SESSION_SECONDS = 8 * 60 * 60
 
 
-def _create_session() -> str:
-    payload = f"{settings.ADMIN_USERNAME}:{int(time.time()) + SESSION_SECONDS}"
+def _create_session(username: str | None = None) -> str:
+    payload = f"{username or settings.ADMIN_USERNAME}:{int(time.time()) + SESSION_SECONDS}"
     signature = hmac.new(
         settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
     ).hexdigest()
@@ -60,7 +65,10 @@ def _valid_session(token: str | None) -> bool:
             settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
         ).hexdigest()
         return (
-            hmac.compare_digest(username, settings.ADMIN_USERNAME)
+            (
+                hmac.compare_digest(username, settings.ADMIN_USERNAME)
+                or username.lower() in google_allowed_emails()
+            )
             and int(expires) > time.time()
             and hmac.compare_digest(signature, expected)
         )
@@ -70,7 +78,7 @@ def _valid_session(token: str | None) -> bool:
 
 @app.middleware("http")
 async def require_admin(request: Request, call_next):
-    if request.url.path in {"/healthz", "/login"} or not settings.ADMIN_API_KEY:
+    if request.url.path in {"/healthz", "/login", *GOOGLE_PATHS} or not settings.ADMIN_API_KEY:
         return await call_next(request)
     authorization = request.headers.get("Authorization", "")
     try:
@@ -97,9 +105,21 @@ async def require_admin(request: Request, call_next):
 LOGIN_TEMPLATE = (Path(__file__).parent / "login.html").read_text(encoding="utf-8")
 
 
-def _render_login(*, error: bool = False, username: str = "") -> str:
-    alert = '<div class="alert" role="alert">Credenciales incorrectas</div>' if error else ""
-    return LOGIN_TEMPLATE.replace("{{ERROR}}", alert).replace(
+GOOGLE_BUTTON = (
+    '<a class="google" href="/login/google"><b>G</b>Continuar con Google</a>'
+)
+
+
+def _render_login(
+    *, error: bool = False, username: str = "", message: str = "Credenciales incorrectas"
+) -> str:
+    alert = f'<div class="alert" role="alert">{html.escape(message)}</div>' if error else ""
+    google = (
+        GOOGLE_BUTTON
+        if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET
+        else ""
+    )
+    return LOGIN_TEMPLATE.replace("{{GOOGLE}}", google).replace("{{ERROR}}", alert).replace(
         "{{USERNAME}}", html.escape(username, quote=True)
     )
 
@@ -126,6 +146,84 @@ def login(username: str = Form(...), password: str = Form(...)):
         samesite="lax",
     )
     return response
+
+
+def _google_redirect_uri(request: Request) -> str:
+    return settings.GOOGLE_REDIRECT_URI or str(request.url_for("google_callback"))
+
+
+@app.get("/login/google")
+def google_login(request: Request):
+    if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+        return RedirectResponse("/login")
+    state = secrets.token_urlsafe(24)
+    query = urlencode(
+        {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "redirect_uri": _google_redirect_uri(request),
+            "response_type": "code",
+            "scope": "openid email",
+            "state": state,
+            "prompt": "select_account",
+            "login_hint": settings.IMAP_USER,
+        }
+    )
+    response = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{query}")
+    response.set_cookie(
+        GOOGLE_STATE_COOKIE,
+        state,
+        max_age=600,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+    )
+    return response
+
+
+@app.get("/login/google/callback", name="google_callback")
+def google_callback(request: Request, code: str = "", state: str = ""):
+    expected = request.cookies.get(GOOGLE_STATE_COOKIE, "")
+    if not (code and state and expected and hmac.compare_digest(state, expected)):
+        return _google_error("No se pudo iniciar sesion con Google", 401)
+    try:
+        token = httpx.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "redirect_uri": _google_redirect_uri(request),
+                "grant_type": "authorization_code",
+            },
+            timeout=10,
+        )
+        token.raise_for_status()
+        # The id_token comes straight from Google's token endpoint over TLS, so
+        # its claims are trusted without re-verifying the signature (OIDC 3.1.3.7).
+        segment = token.json()["id_token"].split(".")[1]
+        claims = json.loads(
+            base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
+        )
+    except (httpx.HTTPError, KeyError, IndexError, ValueError):
+        return _google_error("No se pudo iniciar sesion con Google", 401)
+    email = str(claims.get("email", "")).lower()
+    if not claims.get("email_verified") or email not in google_allowed_emails():
+        return _google_error("Ese correo no tiene acceso", 403)
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE,
+        _create_session(email),
+        max_age=SESSION_SECONDS,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+    )
+    response.delete_cookie(GOOGLE_STATE_COOKIE)
+    return response
+
+
+def _google_error(message: str, status: int) -> HTMLResponse:
+    return HTMLResponse(_render_login(error=True, message=message), status_code=status)
 
 
 @app.post("/logout")

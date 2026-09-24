@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     ADMIN_API_KEY: str | None = None
     ADMIN_USERNAME: str = "admin"
 
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
+    GOOGLE_ALLOWED_EMAILS: str = ""
+
     METRICS_ENABLED: bool = True
     OTEL_ENABLED: bool = False
     OTEL_SERVICE_NAME: str = "sync-bank-backend"
@@ -30,3 +35,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def google_allowed_emails() -> set[str]:
+    extra = settings.GOOGLE_ALLOWED_EMAILS.split(",")
+    return {e.strip().lower() for e in [settings.IMAP_USER, *extra] if e.strip()}
