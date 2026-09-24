@@ -115,3 +115,33 @@ async def test_missing_label_reports_a_clear_error_and_reads_nothing(imap, monke
     assert "Mostrar en IMAP" in detail["reason"]
     assert imap.instances[0].searched == 0
     assert imap.instances[0].logged_out is True
+
+
+@pytest.mark.asyncio
+async def test_an_unopenable_mailbox_is_reported_as_a_fatal_error(imap, monkeypatch):
+    monkeypatch.setattr(email_service.settings, "IMAP_MAILBOX", "NoExiste")
+    imap.next_select_status = "NO"
+
+    summary = await email_service.check_emails()
+
+    assert "NoExiste" in summary["fatal_error"]
+
+
+@pytest.mark.asyncio
+async def test_an_imap_connection_failure_is_reported_as_a_fatal_error(monkeypatch):
+    class Broken:
+        def __init__(self, *args, **kwargs):
+            raise OSError("connection refused")
+
+    monkeypatch.setattr(email_service.imaplib, "IMAP4_SSL", Broken)
+
+    async def no_context(*, apply_ai):
+        return {}
+
+    monkeypatch.setattr(
+        email_service.ingestion_service, "build_prefill_context", no_context
+    )
+
+    summary = await email_service.check_emails()
+
+    assert "connection refused" in summary["fatal_error"]

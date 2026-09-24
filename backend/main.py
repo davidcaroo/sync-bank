@@ -19,6 +19,10 @@ from config import google_allowed_emails, settings, validate_security_settings
 from observability.telemetry import init_telemetry
 from routers import facturas, proceso, config, logs, contactos, providers
 from scheduler import start_scheduler
+from services.sync_job_service import (
+    start_runner as start_sync_runner,
+    stop_runner as stop_sync_runner,
+)
 from middleware.metrics import RequestTimingMiddleware
 from middleware.request_id import RequestIdMiddleware
 from repositories.database import close_pool, open_pool
@@ -32,9 +36,11 @@ async def lifespan(app: FastAPI):
     apply_schema_upgrades()
     init_telemetry()
     start_scheduler()
+    start_sync_runner()
     try:
         yield
     finally:
+        stop_sync_runner()
         close_pool()
 
 

@@ -1,41 +1,28 @@
 from fastapi import APIRouter
-from services.email_service import check_emails
-from services.timezone_service import now_bogota
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
+
+from repositories.db_utils import run_in_executor
+from services import sync_job_service
 
 router = APIRouter(prefix="/proceso", tags=["proceso"])
-
-last_run = None
-last_summary = None
 
 
 @router.post("/manual")
 async def trigger_manual():
-    global last_run, last_summary
-    summary = await check_emails(search_criteria="ALL")
-    last_run = now_bogota()
-    last_summary = summary or {}
-
-    created = int((summary or {}).get("created") or 0)
-    duplicates = int((summary or {}).get("duplicates") or 0)
-    invalid = int((summary or {}).get("invalid") or 0)
-    errors = int((summary or {}).get("errors") or 0)
-
-    status = "success"
-    if errors > 0:
-        status = "partial"
-    if created == 0 and duplicates == 0 and invalid == 0 and errors == 0:
-        status = "noop"
-
-    return {
-        "status": status,
-        "timestamp": last_run,
-        "summary": last_summary,
-    }
+    """Queues the email sync (or returns the active one) and answers at once."""
+    result = await sync_job_service.enqueue("manual")
+    return JSONResponse(status_code=202, content=jsonable_encoder(result))
 
 
 @router.get("/status")
 async def get_status():
+    job = await run_in_executor(sync_job_service.current_status)
+    if not job:
+        return {"job": None, "summary": {}, "last_execution": None}
+    job = jsonable_encoder(job)
     return {
-        "last_execution": last_run,
-        "summary": last_summary or {},
+        "job": job,
+        "summary": job.get("result") or {},
+        "last_execution": job.get("finished_at") or job.get("started_at"),
     }

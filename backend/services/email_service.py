@@ -87,7 +87,7 @@ def _decode_mime_filename(filename: str | None) -> str:
         return filename
 
 
-async def check_emails(search_criteria: str = "UNSEEN"):
+async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
     summary = {
         "messages_found": 0,
         "messages_processed": 0,
@@ -112,6 +112,7 @@ async def check_emails(search_criteria: str = "UNSEEN"):
         select_status, _ = mail.select(_mailbox_arg(mailbox))
         if select_status != "OK":
             summary["errors"] += 1
+            summary["fatal_error"] = f"No se pudo abrir la carpeta o etiqueta '{mailbox}'"
             summary["invalid_details"].append(
                 {
                     "source": "imap",
@@ -138,6 +139,7 @@ async def check_emails(search_criteria: str = "UNSEEN"):
         print(f"IMAP Search: {status}, found {found_messages} messages")
         if status != "OK":
             summary["errors"] += 1
+            summary["fatal_error"] = f"Busqueda IMAP fallida: {status}"
             return summary
 
         for num in messages[0].split():
@@ -262,6 +264,13 @@ async def check_emails(search_criteria: str = "UNSEEN"):
                 summary["errors"] += 1
 
             summary["messages_processed"] += 1
+            if on_progress:
+                await on_progress(
+                    {
+                        "messages_found": summary["messages_found"],
+                        "messages_processed": summary["messages_processed"],
+                    }
+                )
 
             # Keep payload bounded for API response/UI rendering.
             if len(summary["invalid_details"]) > 100:
@@ -276,4 +285,5 @@ async def check_emails(search_criteria: str = "UNSEEN"):
     except Exception as e:
         print(f"IMAP Error: {e}")
         summary["errors"] += 1
+        summary["fatal_error"] = str(e) or repr(e)
         return summary
