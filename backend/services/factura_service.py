@@ -7,6 +7,7 @@ import httpx
 from dateutil import parser as date_parser
 from fastapi import HTTPException
 
+from config import settings
 from models.factura import FacturaDIAN, FacturaItem
 from observability.telemetry import get_tracer
 from repositories.factura_async_repository import (
@@ -19,6 +20,7 @@ from services.alegra_service import alegra_service
 from services.errors import AlegraDuplicateBillError, RemoteAPIError
 from services.ingestion_service import ingestion_service
 from services.provider_mapping_service import provider_mapping_service
+from services.provider_mapping.normalization import normalize_nit
 from services.timezone_service import now_bogota, to_bogota
 from services.xml_parser import parse_xml_dian
 
@@ -448,10 +450,59 @@ class FacturaService:
             "detalle": results,
         }
 
+    async def _marcar_ya_en_alegra(self, factura_id: str, bill_id) -> None:
+        await self._factura_repository.update_factura_fields(
+            factura_id, {"estado": "procesado"}
+        )
+        # Same convention as DUPLICADO_ALEGRA: not "exitoso", so it never teaches
+        # account mappings that nobody confirmed.
+        await self._causacion_repository.save_causacion(
+            {
+                "factura_id": factura_id,
+                "alegra_bill_id": str(bill_id) if bill_id else None,
+                "alegra_response": {"code": "YA_EN_ALEGRA"},
+                "estado": "fallido",
+                "intentos": 0,
+                "error_msg": "YA_EN_ALEGRA",
+            }
+        )
+
+    async def marcar_si_ya_esta_en_alegra(self, factura_id: str) -> dict:
+        """Pending invoice that Alegra already has -> procesado. Never writes to Alegra."""
+        factura = await self._factura_repository.get_factura_with_items(factura_id)
+        if not factura or factura.get("estado") != "pendiente":
+            return {"status": "skipped"}
+        remote = await self._check_remote_bill_status(factura)
+        if remote.get("exists") is not True:
+            return {"status": "pending"}
+        await self._marcar_ya_en_alegra(factura_id, remote.get("bill_id"))
+        return {"status": "already_in_alegra", "alegra_bill_id": remote.get("bill_id")}
+
+    async def aplicar_reconciliacion(self) -> dict:
+        report = await self.reconciliar_pendientes()
+        marcadas = 0
+        for row in report["detalle"]:
+            if row.get("ya_causada_en_alegra"):
+                await self._marcar_ya_en_alegra(row["id"], row.get("alegra_bill_id"))
+                marcadas += 1
+        return {"total_revisadas": report["total_revisadas"], "marcadas_procesadas": marcadas}
+
     async def causar_factura(self, factura_id: str, overrides_map: dict | None = None):
         factura_data = await self._factura_repository.get_factura_with_items(factura_id)
         if not factura_data:
             raise HTTPException(status_code=404, detail="Factura no encontrada")
+
+        receptor = normalize_nit(factura_data.get("nit_receptor"))
+        company = normalize_nit(settings.COMPANY_NIT)
+        # 123456789 is the parser's placeholder when the invoice has no receptor NIT.
+        if company and receptor not in {"", "123456789", company}:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "La factura esta emitida a otro NIT, no a la empresa",
+                    "code": "NIT_RECEPTOR_NO_COINCIDE",
+                },
+            )
 
         existing_success = await self._factura_repository.get_successful_causacion(
             factura_id

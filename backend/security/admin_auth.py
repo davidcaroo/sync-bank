@@ -1,3 +1,5 @@
+import hmac
+
 from fastapi import Header, HTTPException
 from config import settings
 
@@ -7,5 +9,7 @@ def verify_admin_key(
 ):
     if not settings.ADMIN_API_KEY:
         raise HTTPException(status_code=503, detail="Admin key no configurada")
-    if not x_admin_key or x_admin_key != settings.ADMIN_API_KEY:
+    if not x_admin_key or not hmac.compare_digest(
+        x_admin_key, settings.ADMIN_API_KEY
+    ):
         raise HTTPException(status_code=403, detail="No autorizado")

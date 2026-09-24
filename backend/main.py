@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from config import google_allowed_emails, settings
+from config import google_allowed_emails, settings, validate_security_settings
 from observability.telemetry import init_telemetry
 from routers import facturas, proceso, config, logs, contactos, providers
 from scheduler import start_scheduler
@@ -27,6 +27,7 @@ from repositories.schema_upgrades import apply_schema_upgrades
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_security_settings()
     open_pool()
     apply_schema_upgrades()
     init_telemetry()
@@ -45,25 +46,25 @@ SESSION_COOKIE = "syncbank_session"
 SESSION_SECONDS = 8 * 60 * 60
 
 
+def _session_key() -> bytes:
+    return (settings.SESSION_SECRET or settings.ADMIN_API_KEY or "").encode()
+
+
 def _create_session(username: str | None = None) -> str:
     payload = f"{username or settings.ADMIN_USERNAME}:{int(time.time()) + SESSION_SECONDS}"
-    signature = hmac.new(
-        settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
+    signature = hmac.new(_session_key(), payload.encode(), hashlib.sha256).hexdigest()
     return base64.urlsafe_b64encode(f"{payload}:{signature}".encode()).decode()
 
 
 def _valid_session(token: str | None) -> bool:
-    if not token or not settings.ADMIN_API_KEY:
+    if not token or not _session_key():
         return False
     try:
         username, expires, signature = (
             base64.urlsafe_b64decode(token).decode().split(":")
         )
         payload = f"{username}:{expires}"
-        expected = hmac.new(
-            settings.ADMIN_API_KEY.encode(), payload.encode(), hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(_session_key(), payload.encode(), hashlib.sha256).hexdigest()
         return (
             (
                 hmac.compare_digest(username, settings.ADMIN_USERNAME)

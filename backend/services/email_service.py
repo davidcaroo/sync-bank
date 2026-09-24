@@ -1,7 +1,6 @@
 import base64
 import imaplib
 import email
-import hashlib
 import logging
 import re
 from email.header import decode_header
@@ -9,9 +8,8 @@ from config import settings
 from repositories.logs_repository import upsert_email_log
 from repositories.db_utils import run_in_executor
 from services.auto_causacion_service import auto_causacion_service
+from services.factura_service import factura_service
 from services.ingestion_service import ingestion_service
-from services.pdf_extraction_service import extraer_pdf_from_bytes
-from repositories.pending_document_repository import save_pending_document
 
 
 logger = logging.getLogger("email_service")
@@ -45,6 +43,19 @@ def _mailbox_arg(name: str) -> str:
         return encoded
     escaped = encoded.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
+
+
+async def _already_in_alegra(factura_id: str, summary: dict) -> bool:
+    """True when Alegra already has the bill; a failed check just leaves it pending."""
+    try:
+        outcome = await factura_service.marcar_si_ya_esta_en_alegra(factura_id)
+    except Exception:
+        logger.exception("alegra_check_failed", extra={"factura_id": factura_id})
+        return False
+    if outcome.get("status") == "already_in_alegra":
+        summary["already_in_alegra"] += 1
+        return True
+    return False
 
 
 async def _try_auto_causacion(factura_id: str, summary: dict) -> None:
@@ -85,6 +96,7 @@ async def check_emails(search_criteria: str = "UNSEEN"):
         "created": 0,
         "auto_caused": 0,
         "auto_pending": 0,
+        "already_in_alegra": 0,
         "duplicates": 0,
         "invalid": 0,
         "errors": 0,
@@ -162,39 +174,10 @@ async def check_emails(search_criteria: str = "UNSEEN"):
                 if not content:
                     continue
 
-                if not lower_name.endswith((".xml", ".zip", ".pdf")):
+                if not lower_name.endswith((".xml", ".zip")):
                     continue
 
                 has_relevant_attachment = True
-                if lower_name.endswith(".pdf"):
-                    try:
-                        extraction = await extraer_pdf_from_bytes(filename, content)
-                        digest = hashlib.sha256(content).hexdigest()
-                        for candidate in extraction.get("facturas", []):
-                            await run_in_executor(
-                                lambda item=candidate: save_pending_document(
-                                    {
-                                        "message_id": msg["Message-ID"] or digest,
-                                        "attachment_sha256": digest,
-                                        "file_name": filename,
-                                        "page_start": item["page_start"],
-                                        "page_end": item["page_end"],
-                                        "raw_text": item["raw_text"],
-                                        "candidate": item,
-                                        "missing_fields": item.get(
-                                            "missing_fields", []
-                                        ),
-                                        "warnings": item.get("warnings", []),
-                                    }
-                                )
-                            )
-                            summary["pdf_candidates"] += 1
-                        email_log["attachments_encontrados"] += 1
-                    except Exception:
-                        summary["errors"] += 1
-                        has_errors = True
-                    continue
-
                 extracted = ingestion_service.extract_xml_documents_from_attachment(
                     filename, content
                 )
@@ -234,10 +217,11 @@ async def check_emails(search_criteria: str = "UNSEEN"):
                         status_result = result.get("status")
                         if status_result == "created":
                             summary["created"] += 1
-                            if result.get("factura_id"):
-                                await _try_auto_causacion(
-                                    str(result["factura_id"]), summary
-                                )
+                            factura_id = result.get("factura_id")
+                            if factura_id and not await _already_in_alegra(
+                                str(factura_id), summary
+                            ):
+                                await _try_auto_causacion(str(factura_id), summary)
                         elif status_result == "duplicate":
                             summary["duplicates"] += 1
                         elif status_result == "invalid":

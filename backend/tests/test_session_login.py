@@ -99,3 +99,23 @@ def test_google_login_rejects_other_emails_and_bad_state(monkeypatch):
         state = client.cookies.get("syncbank_oauth_state")
         assert client.get(f"/login/google/callback?code=a&state={state}").status_code == 403
         assert client.get("/login/google/callback?code=a&state=wrong").status_code == 401
+
+
+def test_production_refuses_to_start_without_admin_key_and_session_secret(monkeypatch):
+    import pytest
+    from config import settings, validate_security_settings
+
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "SESSION_SECRET", None)
+    with pytest.raises(RuntimeError):
+        validate_security_settings()
+    monkeypatch.setattr(settings, "SESSION_SECRET", "another-secret")
+    validate_security_settings()
+
+
+def test_cookie_is_signed_with_session_secret_not_the_admin_key(monkeypatch):
+    monkeypatch.setattr(main.settings, "SESSION_SECRET", "cookie-secret")
+    token = main._create_session()
+    assert main._valid_session(token)
+    monkeypatch.setattr(main.settings, "SESSION_SECRET", "rotated-secret")
+    assert not main._valid_session(token)

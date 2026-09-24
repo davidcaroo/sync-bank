@@ -195,6 +195,12 @@ async def reconciliar_pendientes_alegra():
     return await factura_service.reconciliar_pendientes()
 
 
+@router.post("/reconciliar-alegra/aplicar")
+async def aplicar_reconciliacion_alegra():
+    """Marks as procesado every pending invoice Alegra already has. Writes nothing to Alegra."""
+    return await factura_service.aplicar_reconciliacion()
+
+
 @router.get("/")
 async def get_facturas(
     page: int = Query(1, ge=1),

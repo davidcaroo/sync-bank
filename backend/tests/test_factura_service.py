@@ -293,3 +293,69 @@ async def test_causation_is_blocked_while_an_item_has_no_account(monkeypatch):
 
     assert exc.value.detail["code"] == "REQUIERE_CONFIRMACION_MANUAL"
     assert not [event for event in fakes.events if event[0] == "crear_bill"]
+
+
+@pytest.mark.asyncio
+async def test_invoice_addressed_to_another_company_is_never_caused(monkeypatch):
+    from fastapi import HTTPException
+    from config import settings
+
+    monkeypatch.setattr(settings, "COMPANY_NIT", "900741732")
+    fakes = _CausacionFakes([_item(centro_costo_alegra="12")])
+    service = _causacion_service(fakes, monkeypatch)
+
+    with pytest.raises(HTTPException) as exc:
+        await service.causar_factura("f1", {})
+
+    assert exc.value.detail["code"] == "NIT_RECEPTOR_NO_COINCIDE"
+    assert not [event for event in fakes.events if event[0] == "crear_bill"]
+
+
+@pytest.mark.asyncio
+async def test_invoice_for_the_company_or_without_receptor_is_still_caused(monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "COMPANY_NIT", "900741732")
+    for receptor in ("900741732", None, "123456789"):
+        fakes = _CausacionFakes([_item(centro_costo_alegra="12")])
+        fakes.factura["nit_receptor"] = receptor
+        service = _causacion_service(fakes, monkeypatch)
+
+        await service.causar_factura("f1", {})
+
+        assert [event for event in fakes.events if event[0] == "crear_bill"]
+
+
+@pytest.mark.asyncio
+async def test_pending_invoice_already_in_alegra_becomes_procesado(monkeypatch):
+    fakes = _CausacionFakes([_item()])
+    service = _causacion_service(fakes, monkeypatch)
+
+    async def remote(**kwargs):
+        return {"bill_id": "77"}
+
+    monkeypatch.setattr(
+        "services.factura_service.alegra_service.get_bill_accounting_by_invoice", remote
+    )
+
+    outcome = await service.marcar_si_ya_esta_en_alegra("f1")
+
+    assert outcome["status"] == "already_in_alegra"
+    assert ("factura", {"estado": "procesado"}) in fakes.events
+    assert not [event for event in fakes.events if event[0] == "crear_bill"]
+
+
+@pytest.mark.asyncio
+async def test_pending_invoice_missing_in_alegra_stays_pending(monkeypatch):
+    fakes = _CausacionFakes([_item()])
+    service = _causacion_service(fakes, monkeypatch)
+
+    async def remote(**kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "services.factura_service.alegra_service.get_bill_accounting_by_invoice", remote
+    )
+
+    assert (await service.marcar_si_ya_esta_en_alegra("f1"))["status"] == "pending"
+    assert not [event for event in fakes.events if event[0] == "factura"]

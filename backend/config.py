@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     ADMIN_API_KEY: str | None = None
     ADMIN_USERNAME: str = "admin"
+    SESSION_SECRET: str | None = None
+    COMPANY_NIT: str | None = None
 
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
@@ -35,6 +37,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def validate_security_settings() -> None:
+    if settings.APP_ENV == "production" and not (
+        settings.ADMIN_API_KEY and settings.SESSION_SECRET
+    ):
+        raise RuntimeError(
+            "En produccion ADMIN_API_KEY y SESSION_SECRET son obligatorias"
+        )
 
 
 def google_allowed_emails() -> set[str]:
