@@ -17,7 +17,7 @@ def client(monkeypatch):
     ):
         monkeypatch.setattr(main, name, lambda: None)
     with TestClient(main.app, follow_redirects=False) as c:
-        c.auth = ("admin", "test")
+        c.headers["X-Admin-Key"] = "test"
         yield c
 
 

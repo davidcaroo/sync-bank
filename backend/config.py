@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     ADMIN_API_KEY: str | None = None
     ADMIN_USERNAME: str = "admin"
+    # Password login (the ADMIN_USERNAME account) is off; people sign in with Google.
+    # Set true only as an emergency way back in.
+    PASSWORD_LOGIN_ENABLED: bool = False
     SESSION_SECRET: str | None = None
     COMPANY_NIT: str | None = None
     MIN_ISSUE_DATE: str = "2026-09-01"

@@ -50,6 +50,12 @@ No se usa IA ni un servicio de clasificación externo: la clasificación contabl
 4. **Revisión y causación**: El operador revisa la clasificación, la corrige si hace falta y presiona **Causar en Alegra**.
 5. **Panel**: Muestra el estado de todo el proceso.
 
+## 🔐 Acceso
+
+- **Personas**: solo con Google. Entra `IMAP_USER` y los correos de `GOOGLE_ALLOWED_EMAILS`. La sesión dura 14 días y el navegador recuerda la última cuenta usada, así Google no vuelve a pedir el correo.
+- **El usuario `admin` con contraseña está deshabilitado** (`PASSWORD_LOGIN_ENABLED=false`). Poner `true` solo como vía de emergencia.
+- **Scripts y monitoreo**: envían el header `X-Admin-Key` con `ADMIN_API_KEY`. Ya no se acepta autenticación Basic.
+
 ## 🔁 Sincronización durable
 
 - **Trabajos**: cada lectura del correo es una fila de `sync_jobs` con estado `pending` → `running` → `succeeded` o `failed`, progreso y resultado. Solo puede existir un trabajo activo; pedirlo dos veces devuelve el mismo.

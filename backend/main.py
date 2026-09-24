@@ -2,6 +2,7 @@ import html
 import logging
 import json
 import base64
+import re
 import hmac
 import hashlib
 import secrets
@@ -50,14 +51,18 @@ GOOGLE_PATHS = {"/login/google", "/login/google/callback"}
 GOOGLE_STATE_COOKIE = "syncbank_oauth_state"
 SESSION_COOKIE = "syncbank_session"
 SESSION_SECONDS = 8 * 60 * 60
+GOOGLE_SESSION_SECONDS = 14 * 24 * 60 * 60
+LAST_EMAIL_COOKIE = "syncbank_last_email"
 
 
 def _session_key() -> bytes:
     return (settings.SESSION_SECRET or settings.ADMIN_API_KEY or "").encode()
 
 
-def _create_session(username: str | None = None) -> str:
-    payload = f"{username or settings.ADMIN_USERNAME}:{int(time.time()) + SESSION_SECONDS}"
+def _create_session(
+    username: str | None = None, seconds: int = SESSION_SECONDS
+) -> str:
+    payload = f"{username or settings.ADMIN_USERNAME}:{int(time.time()) + seconds}"
     signature = hmac.new(_session_key(), payload.encode(), hashlib.sha256).hexdigest()
     return base64.urlsafe_b64encode(f"{payload}:{signature}".encode()).decode()
 
@@ -73,7 +78,10 @@ def _valid_session(token: str | None) -> bool:
         expected = hmac.new(_session_key(), payload.encode(), hashlib.sha256).hexdigest()
         return (
             (
-                hmac.compare_digest(username, settings.ADMIN_USERNAME)
+                (
+                    settings.PASSWORD_LOGIN_ENABLED
+                    and hmac.compare_digest(username, settings.ADMIN_USERNAME)
+                )
                 or username.lower() in google_allowed_emails()
             )
             and int(expires) > time.time()
@@ -87,19 +95,12 @@ def _valid_session(token: str | None) -> bool:
 async def require_admin(request: Request, call_next):
     if request.url.path in {"/healthz", "/login", *GOOGLE_PATHS} or not settings.ADMIN_API_KEY:
         return await call_next(request)
-    authorization = request.headers.get("Authorization", "")
-    try:
-        scheme, encoded = authorization.split(" ", 1)
-        username, password = base64.b64decode(encoded).decode().split(":", 1)
-    except (ValueError, UnicodeDecodeError):
-        scheme, username, password = "", "", ""
-    valid_basic = (
-        scheme.lower() == "basic"
-        and hmac.compare_digest(username, settings.ADMIN_USERNAME)
-        and hmac.compare_digest(password, settings.ADMIN_API_KEY)
+    # Machine access (scripts, monitoring) sends the admin key; people use a session.
+    valid_key = hmac.compare_digest(
+        request.headers.get("X-Admin-Key", "").encode(), settings.ADMIN_API_KEY.encode()
     )
     valid_cookie = _valid_session(request.cookies.get(SESSION_COOKIE))
-    if not (valid_basic or valid_cookie):
+    if not (valid_key or valid_cookie):
         if not request.url.path.startswith(("/api/", "/metrics")):
             return RedirectResponse("/login")
         return JSONResponse(
@@ -126,7 +127,13 @@ def _render_login(
         if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET
         else ""
     )
-    return LOGIN_TEMPLATE.replace("{{GOOGLE}}", google).replace("{{ERROR}}", alert).replace(
+    page = LOGIN_TEMPLATE
+    if not settings.PASSWORD_LOGIN_ENABLED:
+        # No form to show the error in, so it goes above the Google button.
+        page = re.sub(r"<form\b.*?</form>", "", page, flags=re.S)
+        google = alert + google
+        alert = ""
+    return page.replace("{{GOOGLE}}", google).replace("{{ERROR}}", alert).replace(
         "{{USERNAME}}", html.escape(username, quote=True)
     )
 
@@ -138,6 +145,11 @@ def login_page():
 
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...)):
+    if not settings.PASSWORD_LOGIN_ENABLED:
+        return HTMLResponse(
+            _render_login(error=True, message="El acceso con contrasena esta deshabilitado"),
+            status_code=403,
+        )
     if not (
         hmac.compare_digest(username, settings.ADMIN_USERNAME)
         and hmac.compare_digest(password, settings.ADMIN_API_KEY or "")
@@ -164,6 +176,8 @@ def google_login(request: Request):
     if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
         return RedirectResponse("/login")
     state = secrets.token_urlsafe(24)
+    last_email = request.cookies.get(LAST_EMAIL_COOKIE)
+    hint = {"login_hint": last_email} if last_email else {}
     query = urlencode(
         {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -171,8 +185,7 @@ def google_login(request: Request):
             "response_type": "code",
             "scope": "openid email",
             "state": state,
-            "prompt": "select_account",
-            "login_hint": settings.IMAP_USER,
+            **hint,
         }
     )
     response = RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{query}")
@@ -219,8 +232,16 @@ def google_callback(request: Request, code: str = "", state: str = ""):
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
         SESSION_COOKIE,
-        _create_session(email),
-        max_age=SESSION_SECONDS,
+        _create_session(email, GOOGLE_SESSION_SECONDS),
+        max_age=GOOGLE_SESSION_SECONDS,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+    )
+    response.set_cookie(
+        LAST_EMAIL_COOKIE,
+        email,
+        max_age=365 * 24 * 60 * 60,
         httponly=True,
         secure=settings.APP_ENV == "production",
         samesite="lax",
