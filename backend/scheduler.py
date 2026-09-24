@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from services import pending_maintenance
 from services.email_service import check_emails
 from services.provider_mapping_service import provider_mapping_service
 
@@ -15,6 +16,13 @@ _MAX_CONCURRENCY = 5
 
 def start_scheduler():
     scheduler.add_job(check_emails, "interval", minutes=5)
+    scheduler.add_job(
+        pending_maintenance.run_scheduled,
+        "interval",
+        minutes=15,
+        max_instances=1,
+        coalesce=True,
+    )
     # Recompute provider->account mappings every 6 hours
     try:
         scheduler.add_job(

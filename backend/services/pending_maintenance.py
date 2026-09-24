@@ -22,12 +22,14 @@ state = {
 _task: asyncio.Task | None = None
 
 
-async def _rule_for(nit: str, nombre: str | None, cache: dict) -> dict | None:
+async def _rule_for(
+    nit: str, nombre: str | None, cache: dict, relearn: bool
+) -> dict | None:
     if nit in cache:
         return cache[nit]
     config = await run_in_executor(lambda: get_config_cuenta(nit))
     computed = None
-    if not config or config.get("source") != "manual":
+    if not config or (relearn and config.get("source") != "manual"):
         # Relearn from the learning window; manual rules are never touched.
         computed = await provider_mapping_service.compute_and_save_mapping(
             nit, nombre
@@ -58,7 +60,7 @@ async def _rule_for(nit: str, nombre: str | None, cache: dict) -> dict | None:
     return rule
 
 
-async def _process(factura_id: str, cache: dict) -> None:
+async def _process(factura_id: str, cache: dict, relearn: bool) -> None:
     repo = factura_service._factura_repository
     factura = await repo.get_factura_with_items(factura_id)
     if not factura or factura.get("estado") != "pendiente":
@@ -84,7 +86,7 @@ async def _process(factura_id: str, cache: dict) -> None:
     if not items:
         return
     rule = await _rule_for(
-        factura.get("nit_proveedor"), factura.get("nombre_proveedor"), cache
+        factura.get("nit_proveedor"), factura.get("nombre_proveedor"), cache, relearn
     )
     if not rule:
         state["sin_regla"] += 1
@@ -102,7 +104,7 @@ async def _process(factura_id: str, cache: dict) -> None:
     state["prefill"] += 1
 
 
-async def _run() -> None:
+async def _run(relearn: bool) -> None:
     cache: dict = {}
     try:
         res = await factura_service._factura_repository.get_facturas_paginated(
@@ -112,7 +114,7 @@ async def _run() -> None:
         state["total"] = len(rows)
         for row in rows:
             try:
-                await _process(str(row["id"]), cache)
+                await _process(str(row["id"]), cache, relearn)
             except Exception:
                 state["errores"] += 1
                 logger.exception("maintenance_failed", extra={"factura_id": row.get("id")})
@@ -121,11 +123,23 @@ async def _run() -> None:
         state["running"] = False
 
 
+def _reset() -> None:
+    for key in state:
+        state[key] = False if key == "running" else 0
+    state["running"] = True
+
+
 def start() -> dict:
     global _task
     if not state["running"]:
-        for key in state:
-            state[key] = False if key == "running" else 0
-        state["running"] = True
-        _task = asyncio.create_task(_run())
+        _reset()
+        _task = asyncio.create_task(_run(relearn=True))
     return dict(state)
+
+
+async def run_scheduled() -> None:
+    """Periodic run: checks Alegra and prefills, without relearning existing rules."""
+    if state["running"]:
+        return
+    _reset()
+    await _run(relearn=False)
