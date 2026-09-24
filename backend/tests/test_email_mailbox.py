@@ -145,3 +145,61 @@ async def test_an_imap_connection_failure_is_reported_as_a_fatal_error(monkeypat
     summary = await email_service.check_emails()
 
     assert "connection refused" in summary["fatal_error"]
+
+
+class OneMessageImap:
+    def __init__(self, *args, **kwargs):
+        self.seen = []
+
+    def login(self, user, password):
+        return "OK", []
+
+    def select(self, mailbox):
+        return "OK", [b"1"]
+
+    def search(self, charset, criteria):
+        return "OK", [b"1"]
+
+    def fetch(self, num, parts):
+        from email.message import EmailMessage
+
+        from tests.test_extractor_safety import EVENT, attached, make_zip
+
+        msg = EmailMessage()
+        msg["Message-ID"] = "<event@x>"
+        msg["From"] = "no-responder@facture.co"
+        msg["Subject"] = "Evento"
+        msg.set_content("adjunto")
+        msg.add_attachment(
+            make_zip({"evento.xml": attached(EVENT)}),
+            maintype="application",
+            subtype="zip",
+            filename="evento.zip",
+        )
+        return "OK", [(b"1", msg.as_bytes())]
+
+    def store(self, num, command, flags):
+        self.seen.append(num)
+
+    def logout(self):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_dian_events_are_counted_as_ignored_and_the_mail_is_marked_read(monkeypatch):
+    logs = []
+
+    async def no_context(*, apply_ai):
+        return {}
+
+    monkeypatch.setattr(email_service.imaplib, "IMAP4_SSL", OneMessageImap)
+    monkeypatch.setattr(
+        email_service.ingestion_service, "build_prefill_context", no_context
+    )
+    monkeypatch.setattr(email_service, "upsert_email_log", lambda log: logs.append(log))
+
+    summary = await email_service.check_emails()
+
+    assert summary["ignored"] == 1
+    assert summary["invalid"] == 0 and summary["errors"] == 0
+    assert logs[0]["estado"] == "ignorado"

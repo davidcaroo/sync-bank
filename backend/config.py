@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     MIN_ISSUE_DATE: str = "2026-09-01"
     LEARNING_START_DATE: str = "2026-01-01"
 
+    MAX_ATTACHMENT_BYTES: int = 20 * 1024 * 1024
+    MAX_ZIP_ENTRIES: int = 100
+    MAX_ZIP_EXPANDED_BYTES: int = 50 * 1024 * 1024
+    MAX_ZIP_COMPRESSION_RATIO: int = 100
+
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
     GOOGLE_REDIRECT_URI: str | None = None

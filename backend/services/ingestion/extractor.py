@@ -2,6 +2,9 @@ import io
 import zipfile
 from dataclasses import dataclass
 
+from config import settings
+from services.xml_parser import classify_xml
+
 
 @dataclass
 class XMLDocument:
@@ -46,6 +49,19 @@ class IngestionExtractor:
         name = file_name or "sin_nombre"
         lower_name = name.lower()
 
+        if len(content) > settings.MAX_ATTACHMENT_BYTES:
+            return {
+                "documents": [],
+                "errors": [
+                    {
+                        "file_name": name,
+                        "entry_name": name,
+                        "status": "invalid",
+                        "reason": "Adjunto excede el tamano maximo permitido.",
+                    }
+                ],
+            }
+
         if lower_name.endswith(".xml"):
             xml_text = self._decode_xml_bytes(content)
             if xml_text is None:
@@ -60,12 +76,10 @@ class IngestionExtractor:
                         }
                     ],
                 }
-            return {
-                "documents": [
-                    XMLDocument(file_name=name, entry_name=name, xml_text=xml_text)
-                ],
-                "errors": [],
-            }
+            documents: list[XMLDocument] = []
+            errors: list[dict] = []
+            self._accept(documents, errors, name, name, xml_text)
+            return {"documents": documents, "errors": errors}
 
         if lower_name.endswith(".zip"):
             docs, errs = self._extract_xml_from_zip_bytes(
@@ -133,6 +147,16 @@ class IngestionExtractor:
 
         try:
             with zipfile.ZipFile(io.BytesIO(content)) as zipped:
+                problem = self._zip_problem(zipped.infolist())
+                if problem:
+                    return documents, [
+                        {
+                            "file_name": zip_name,
+                            "entry_name": path,
+                            "status": "invalid",
+                            "reason": problem,
+                        }
+                    ]
                 for entry_name in zipped.namelist():
                     lower_entry = entry_name.lower()
                     try:
@@ -151,12 +175,8 @@ class IngestionExtractor:
                                     }
                                 )
                                 continue
-                            documents.append(
-                                XMLDocument(
-                                    file_name=zip_name,
-                                    entry_name=nested_path,
-                                    xml_text=xml_text,
-                                )
+                            self._accept(
+                                documents, errors, zip_name, nested_path, xml_text
                             )
                             continue
 
@@ -191,6 +211,45 @@ class IngestionExtractor:
             )
 
         return documents, errors
+
+    @staticmethod
+    def _zip_problem(infos) -> str | None:
+        """Checked from ZIP metadata alone, before decompressing anything."""
+        if len(infos) > settings.MAX_ZIP_ENTRIES:
+            return "ZIP con demasiadas entradas."
+        if any(info.flag_bits & 0x1 for info in infos):
+            return "ZIP cifrado no soportado."
+        if sum(info.file_size for info in infos) > settings.MAX_ZIP_EXPANDED_BYTES:
+            return "ZIP excede el tamano maximo descomprimido."
+        for info in infos:
+            if info.file_size and (
+                not info.compress_size
+                or info.file_size / info.compress_size
+                > settings.MAX_ZIP_COMPRESSION_RATIO
+            ):
+                return "ZIP con relacion de compresion sospechosa."
+        return None
+
+    @staticmethod
+    def _accept(documents, errors, file_name, entry_name, xml_text) -> None:
+        kind = classify_xml(xml_text)
+        if kind == "invoice":
+            documents.append(XMLDocument(file_name, entry_name, xml_text))
+            return
+        if kind == "event":
+            status, reason = "ignored", "Evento DIAN ignorado: no es una factura."
+        elif kind in ("credit_note", "debit_note"):
+            status, reason = "invalid", "Nota credito/debito no soportada."
+        else:
+            status, reason = "invalid", "Documento XML no soportado (no es una factura DIAN)."
+        errors.append(
+            {
+                "file_name": file_name,
+                "entry_name": entry_name,
+                "status": status,
+                "reason": reason,
+            }
+        )
 
     def _decode_xml_bytes(self, content: bytes) -> str | None:
         for encoding in (

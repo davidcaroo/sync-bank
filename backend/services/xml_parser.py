@@ -28,6 +28,21 @@ def _to_float(value: str | None, default: float = 0.0) -> float:
         return default
 
 
+def classify_xml(xml_text: str) -> str:
+    """invoice | event | credit_note | debit_note | other | invalid, by root element."""
+    try:
+        tree = etree.fromstring(xml_text.encode("utf-8"))
+        tree = DIANParser()._unwrap_attached_document(tree)
+    except (XMLSyntaxError, ValueError):
+        return "invalid"
+    return {
+        "Invoice": "invoice",
+        "ApplicationResponse": "event",
+        "CreditNote": "credit_note",
+        "DebitNote": "debit_note",
+    }.get(etree.QName(tree).localname, "other")
+
+
 class DianEventError(ValueError):
     """DIAN event (acuse, recibo...) wrapped like an invoice; it is not an invoice."""
 

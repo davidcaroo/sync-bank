@@ -98,6 +98,7 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
         "auto_pending": 0,
         "already_in_alegra": 0,
         "out_of_range": 0,
+        "ignored": 0,
         "duplicates": 0,
         "invalid": 0,
         "errors": 0,
@@ -186,6 +187,12 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                 )
                 documents = extracted.get("documents") or []
                 extract_errors = extracted.get("errors") or []
+                summary["ignored"] += sum(
+                    1 for err in extract_errors if err.get("status") == "ignored"
+                )
+                extract_errors = [
+                    err for err in extract_errors if err.get("status") != "ignored"
+                ]
 
                 email_log["attachments_encontrados"] += len(documents)
                 summary["xml_extracted"] += len(documents)
