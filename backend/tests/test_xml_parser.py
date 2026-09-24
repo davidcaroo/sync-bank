@@ -112,3 +112,24 @@ def test_an_invoice_without_receiver_nit_is_not_given_a_placeholder():
     )
 
     assert not parse_xml_dian(xml).nit_receptor
+
+
+DECOY_INVOICE = (
+    '<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" '
+    'xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" '
+    'xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">'
+    "<ext:UBLExtensions><ext:UBLExtension><cbc:ID>900320612</cbc:ID>"
+    "<cbc:IssueDate>2020-01-01</cbc:IssueDate></ext:UBLExtension></ext:UBLExtensions>"
+    "<cbc:ID>T0916011103</cbc:ID><cbc:UUID>CUFE-REAL</cbc:UUID>"
+    "<cbc:IssueDate>2026-09-01</cbc:IssueDate></Invoice>"
+)
+
+
+def test_the_invoice_number_is_the_root_id_not_an_id_from_the_extensions():
+    from services.xml_parser import parse_xml_dian
+
+    parsed = parse_xml_dian(DECOY_INVOICE)
+
+    assert parsed.numero_factura == "T0916011103"
+    assert parsed.cufe == "CUFE-REAL"
+    assert parsed.fecha_emision.date().isoformat() == "2026-09-01"

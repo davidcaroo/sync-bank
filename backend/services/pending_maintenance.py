@@ -17,6 +17,7 @@ state = {
     "total": 0,
     "revisadas": 0,
     "eventos_ignorados": 0,
+    "renumeradas": 0,
     "ya_en_alegra": 0,
     "prefill": 0,
     "sin_regla": 0,
@@ -123,9 +124,32 @@ async def _process(factura_id: str, cache: dict, relearn: bool) -> None:
     state["prefill"] += 1
 
 
+async def _renumber(repo) -> None:
+    """Re-read each stored invoice number from its XML (a past parser bug stored an
+    identifier from UBLExtensions instead)."""
+    page = 1
+    while True:
+        rows = (await repo.get_facturas_paginated(page=page, page_size=200)).data or []
+        for row in rows:
+            if not row.get("xml_raw"):
+                continue
+            try:
+                number = parse_xml_dian(row["xml_raw"]).numero_factura
+            except Exception:
+                continue
+            if number and number != "SIN-NUMERO" and number != row.get("numero_factura"):
+                await repo.update_factura_fields(str(row["id"]), {"numero_factura": number})
+                state["renumeradas"] += 1
+        if len(rows) < 200:
+            return
+        page += 1
+
+
 async def _run(relearn: bool) -> None:
     cache: dict = {}
     try:
+        if relearn:
+            await _renumber(factura_service._factura_repository)
         res = await factura_service._factura_repository.get_facturas_paginated(
             page=1, page_size=500, estado="pendiente"
         )

@@ -70,3 +70,30 @@ def test_scheduled_sweep_only_covers_the_last_60_days():
     kept = [r["id"] for r in pending_maintenance._recent(rows)]
 
     assert kept == ["new", "edge", "no-date"]
+
+
+@pytest.mark.asyncio
+async def test_stored_invoice_numbers_are_repaired_from_their_xml(monkeypatch):
+    from tests.test_xml_parser import DECOY_INVOICE
+
+    updates = []
+
+    class Repo:
+        async def get_facturas_paginated(self, *, page, page_size, **kwargs):
+            rows = [
+                {"id": 1, "numero_factura": "900320612", "xml_raw": DECOY_INVOICE},
+                {"id": 2, "numero_factura": "T0916011103", "xml_raw": DECOY_INVOICE},
+                {"id": 3, "numero_factura": "X", "xml_raw": None},
+                {"id": 4, "numero_factura": "Y", "xml_raw": "<not-xml"},
+            ]
+            return type("R", (), {"data": rows if page == 1 else []})()
+
+        async def update_factura_fields(self, factura_id, payload):
+            updates.append((factura_id, payload))
+
+    monkeypatch.setitem(pending_maintenance.state, "renumeradas", 0)
+
+    await pending_maintenance._renumber(Repo())
+
+    assert updates == [("1", {"numero_factura": "T0916011103"})]
+    assert pending_maintenance.state["renumeradas"] == 1

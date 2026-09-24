@@ -62,9 +62,11 @@ class DIANParser:
         if etree.QName(tree).localname == "ApplicationResponse":
             raise DianEventError("Documento de evento DIAN, no es una factura")
 
-        cufe = self._get_text(tree, "//cbc:UUID") or "SIN-CUFE"
-        numero = self._get_text(tree, "//cbc:ID") or "SIN-NUMERO"
-        fecha_emision_raw = self._get_text(tree, "//cbc:IssueDate")
+        # Root-level fields only: UBLExtensions carry their own cbc:ID/IssueDate that
+        # come first in document order and are not the invoice's.
+        cufe = self._get_text(tree, "/*/cbc:UUID") or "SIN-CUFE"
+        numero = self._get_text(tree, "/*/cbc:ID") or "SIN-NUMERO"
+        fecha_emision_raw = self._get_text(tree, "/*/cbc:IssueDate")
 
         nit_proveedor = self._extract_nit_proveedor(tree)
         nombre_proveedor = self._extract_nombre_proveedor(tree)
