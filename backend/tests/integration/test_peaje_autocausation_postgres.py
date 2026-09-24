@@ -2,6 +2,7 @@
 
 import pytest
 
+from config import settings
 from peaje_fixture import PEAJE_ATTACHED_DOCUMENT_XML, PEAJE_DESCRIPTION
 from repositories.config_repository import save_config_cuenta
 from repositories.database import connection
@@ -10,6 +11,11 @@ from services.errors import RemoteAPIError
 from services.ingestion_service import XMLDocument, ingestion_service
 
 NIT = "901209021"
+
+
+@pytest.fixture(autouse=True)
+def peaje_receiver_is_the_company(monkeypatch):
+    monkeypatch.setattr(settings, "COMPANY_NIT", "800123000")
 
 
 def _peaje_xml(n: int) -> str:

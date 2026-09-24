@@ -8,6 +8,7 @@ REQUIRED_ENV = {
     "ALEGRA_EMAIL": "test",
     "ALEGRA_TOKEN": "test",
     "ADMIN_API_KEY": "test",
+    "COMPANY_NIT": "900741732",
     "DATABASE_URL": "postgresql://syncbank:syncbank@localhost:55432/syncbank",
 }
 

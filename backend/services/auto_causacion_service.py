@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 
+from config import settings
 from repositories.config_repository import get_config_cuenta, sync_config_proveedor_nombre
 from repositories.db_utils import run_in_executor
 from repositories.factura_async_repository import (
@@ -53,6 +54,9 @@ def evaluate_auto_causacion(
         config.get("nit_proveedor")
     ):
         return AutoCausacionDecision(False, "nit_mismatch")
+    company = normalize_nit(settings.COMPANY_NIT)
+    if not company or normalize_nit(factura.get("nit_receptor")) != company:
+        return AutoCausacionDecision(False, "receiver_nit_mismatch")
     if not factura.get("xml_raw"):
         return AutoCausacionDecision(False, "not_xml")
     if factura.get("estado") != "pendiente":

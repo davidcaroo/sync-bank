@@ -21,6 +21,7 @@ VALID_FACTURA = {
     "id": "f1",
     "estado": "pendiente",
     "nit_proveedor": "901209021",
+    "nit_receptor": "900741732",
     "xml_raw": "<Invoice/>",
     "cufe": "CUFE-1",
     "numero_factura": "FEUU2183418",
@@ -55,6 +56,9 @@ def test_valid_invoice_and_rule_are_eligible():
         ({}, {"id_cuenta_alegra": None}, "missing_account"),
         ({}, {"id_centro_costo_alegra": None}, "missing_cost_center"),
         ({"nit_proveedor": "800000001"}, {}, "nit_mismatch"),
+        ({"nit_receptor": "800000001"}, {}, "receiver_nit_mismatch"),
+        ({"nit_receptor": None}, {}, "receiver_nit_mismatch"),
+        ({"nit_receptor": "123456789"}, {}, "receiver_nit_mismatch"),
         ({"xml_raw": None}, {}, "not_xml"),
         ({"estado": "procesado"}, {}, "not_pending"),
         ({"cufe": "SIN-CUFE"}, {}, "missing_cufe"),
@@ -226,8 +230,11 @@ async def test_email_helper_counts_outcomes_and_swallows_failures(monkeypatch):
     assert summary == {"auto_caused": 1, "auto_pending": 1}
 
 
-def test_parsed_peaje_invoice_passes_the_guard_with_a_devisab_rule():
+def test_parsed_peaje_invoice_passes_the_guard_with_a_devisab_rule(monkeypatch):
+    from config import settings
     from peaje_fixture import PEAJE_ATTACHED_DOCUMENT_XML
+
+    monkeypatch.setattr(settings, "COMPANY_NIT", "800123000")
     from services.xml_parser import parse_xml_dian
 
     parsed = parse_xml_dian(PEAJE_ATTACHED_DOCUMENT_XML)

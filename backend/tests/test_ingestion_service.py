@@ -21,6 +21,7 @@ class DummyFactura:
         self.numero_factura = "F-1"
         self.fecha_emision = None
         self.nit_proveedor = "9001"
+        self.nit_receptor = "900741732"
         self.nombre_proveedor = "Proveedor"
         self.subtotal = 100
         self.iva = 19
@@ -218,3 +219,71 @@ async def test_invoice_issued_before_min_issue_date_is_ignored(monkeypatch):
     )
 
     assert result["status"] == "ignored"
+
+
+def _receiver_processor(receptor, monkeypatch, company="900741732"):
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from config import settings
+    from services.ingestion.processor import IngestionProcessor
+
+    monkeypatch.setattr(settings, "COMPANY_NIT", company)
+    invoice = SimpleNamespace(
+        nit_receptor=receptor,
+        fecha_emision=datetime(2026, 9, 10),
+        nit_proveedor="9001",
+        nombre_proveedor="Proveedor",
+    )
+    return IngestionProcessor(
+        parse_xml=lambda _xml: invoice,
+        factura_repository=None,
+        provider_config_repository=None,
+    )
+
+
+async def _ingest(processor):
+    from types import SimpleNamespace
+
+    doc = SimpleNamespace(xml_text="<x/>", file_name="a.zip", entry_name="a.xml")
+    return await processor.process_xml_document(
+        doc, persist=True, apply_ai=False, categories=[], cost_centers=[]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "receptor,company,code",
+    [
+        (None, "900741732", "missing_receiver_nit"),
+        ("", "900741732", "missing_receiver_nit"),
+        ("800123000", "900741732", "receiver_nit_mismatch"),
+        ("900741732", None, "company_nit_not_configured"),
+    ],
+)
+async def test_xml_with_a_missing_or_foreign_receiver_is_invalid(
+    receptor, company, code, monkeypatch
+):
+    result = await _ingest(_receiver_processor(receptor, monkeypatch, company))
+
+    assert result["status"] == "invalid" and code in result["reason"]
+
+
+@pytest.mark.asyncio
+async def test_a_formatted_receiver_nit_is_normalized_before_comparing(monkeypatch):
+    from repositories.ingestion_adapters import SyncProviderConfigRepositoryAdapter  # noqa: F401
+
+    processor = _receiver_processor("900.741.732", monkeypatch)
+
+    class Boom(Exception):
+        pass
+
+    async def stop(*args, **kwargs):
+        raise Boom()
+
+    processor._provider_config_repository = type(
+        "P", (), {"sync_proveedor_nombre": staticmethod(stop)}
+    )()
+
+    with pytest.raises(Boom):
+        await _ingest(processor)

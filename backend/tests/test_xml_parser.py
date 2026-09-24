@@ -99,3 +99,16 @@ def test_dian_event_wrapped_as_attached_document_is_not_an_invoice():
 
     with pytest.raises(DianEventError):
         parse_xml_dian(xml)
+
+
+def test_an_invoice_without_receiver_nit_is_not_given_a_placeholder():
+    from services.xml_parser import parse_xml_dian
+
+    xml = (
+        '<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" '
+        'xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">'
+        "<cbc:ID>F1</cbc:ID><cbc:UUID>CUFE-1</cbc:UUID>"
+        "<cbc:IssueDate>2026-09-10</cbc:IssueDate></Invoice>"
+    )
+
+    assert not parse_xml_dian(xml).nit_receptor

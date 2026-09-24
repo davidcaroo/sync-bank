@@ -188,7 +188,7 @@ class DIANParser:
             )
             or ""
         )
-        return _normalize_nit(nit_receptor_raw) or "123456789"
+        return _normalize_nit(nit_receptor_raw) or ""
 
     def _extract_totals(self, tree) -> dict:
         subtotal = _to_float(

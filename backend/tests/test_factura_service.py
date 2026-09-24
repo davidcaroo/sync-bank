@@ -177,7 +177,7 @@ class _CausacionFakes:
             "fecha_emision": "2026-09-14T10:00:00+00:00",
             "nit_proveedor": "900123456",
             "nombre_proveedor": "Proveedor",
-            "nit_receptor": "800123000",
+            "nit_receptor": "900741732",
             "subtotal": 100,
             "iva": 0,
             "total": 100,
@@ -302,6 +302,7 @@ async def test_invoice_addressed_to_another_company_is_never_caused(monkeypatch)
 
     monkeypatch.setattr(settings, "COMPANY_NIT", "900741732")
     fakes = _CausacionFakes([_item(centro_costo_alegra="12")])
+    fakes.factura["nit_receptor"] = "800123000"
     service = _causacion_service(fakes, monkeypatch)
 
     with pytest.raises(HTTPException) as exc:

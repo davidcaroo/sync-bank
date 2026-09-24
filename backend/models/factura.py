@@ -154,7 +154,6 @@ class FacturaDIAN(BaseModel):
                 "numero_factura": self.numero_factura or "SIN-NUMERO",
                 "nit_proveedor": self.nit_proveedor or "999999999",
                 "nombre_proveedor": self.nombre_proveedor or "Proveedor Generico",
-                "nit_receptor": self.nit_receptor or "123456789",
                 "moneda": self.moneda or "COP",
                 "subtotal": subtotal,
                 "iva": max(self.iva, 0.0),

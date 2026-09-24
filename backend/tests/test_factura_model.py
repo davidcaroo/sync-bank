@@ -50,7 +50,7 @@ def test_factura_normalize_sets_defaults_and_totals():
     assert normalized.numero_factura == "SIN-NUMERO"
     assert normalized.nit_proveedor == "999999999"
     assert normalized.nombre_proveedor == "Proveedor Generico"
-    assert normalized.nit_receptor == "123456789"
+    assert normalized.nit_receptor is None
     assert normalized.subtotal == 1000.0
     assert normalized.total == 1175.0
     assert normalized.items[0].descripcion == "Item 1"

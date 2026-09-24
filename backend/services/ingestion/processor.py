@@ -1,6 +1,7 @@
 from datetime import date
 
 from config import settings
+from services.provider_mapping.normalization import normalize_nit
 from services.ingestion.contracts import (
     FacturaRepositoryPort,
     ProviderConfigRepositoryPort,
@@ -18,6 +19,21 @@ class IngestionProcessor:
         self._parse_xml = parse_xml
         self._factura_repository = factura_repository
         self._provider_config_repository = provider_config_repository
+
+    @staticmethod
+    def _receiver_rejection(factura) -> str | None:
+        company = normalize_nit(settings.COMPANY_NIT)
+        receptor = normalize_nit(factura.nit_receptor)
+        if not company:
+            return "COMPANY_NIT no configurado (company_nit_not_configured)."
+        if not receptor:
+            return "La factura no trae NIT del receptor (missing_receiver_nit)."
+        if receptor != company:
+            return (
+                f"Factura emitida a otro NIT {receptor}, no a la empresa "
+                "(receiver_nit_mismatch)."
+            )
+        return None
 
     async def process_xml_document(
         self,
@@ -49,6 +65,15 @@ class IngestionProcessor:
                 "entry_name": xml_doc.entry_name,
                 "status": "ignored",
                 "reason": f"Emitida antes del {settings.MIN_ISSUE_DATE}",
+            }
+
+        rejection = self._receiver_rejection(factura)
+        if rejection:
+            return {
+                "file_name": xml_doc.file_name,
+                "entry_name": xml_doc.entry_name,
+                "status": "invalid",
+                "reason": rejection,
             }
 
         if persist:
