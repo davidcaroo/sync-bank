@@ -194,3 +194,27 @@ def test_peaje_zip_yields_only_the_xml_document():
         "peaje.zip/factura.xml"
     ]
     assert result["errors"] == []
+
+
+@pytest.mark.asyncio
+async def test_invoice_issued_before_min_issue_date_is_ignored(monkeypatch):
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from config import settings
+    from services.ingestion.processor import IngestionProcessor
+
+    monkeypatch.setattr(settings, "MIN_ISSUE_DATE", "2026-09-01")
+    old = SimpleNamespace(fecha_emision=datetime(2025, 12, 31))
+    processor = IngestionProcessor(
+        parse_xml=lambda _xml: old,
+        factura_repository=None,
+        provider_config_repository=None,
+    )
+    doc = SimpleNamespace(xml_text="<x/>", file_name="a.zip", entry_name="a.xml")
+
+    result = await processor.process_xml_document(
+        doc, persist=True, apply_ai=False, categories=[], cost_centers=[]
+    )
+
+    assert result["status"] == "ignored"

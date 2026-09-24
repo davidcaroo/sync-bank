@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     SESSION_SECRET: str | None = None
     COMPANY_NIT: str | None = None
+    MIN_ISSUE_DATE: str = "2026-09-01"
 
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None

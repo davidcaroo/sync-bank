@@ -1,3 +1,6 @@
+from datetime import date
+
+from config import settings
 from services.ingestion.contracts import (
     FacturaRepositoryPort,
     ProviderConfigRepositoryPort,
@@ -35,6 +38,17 @@ class IngestionProcessor:
                 "entry_name": xml_doc.entry_name,
                 "status": "invalid",
                 "reason": f"Error de parser XML: {exc}",
+            }
+
+        if (
+            factura.fecha_emision
+            and factura.fecha_emision.date() < date.fromisoformat(settings.MIN_ISSUE_DATE)
+        ):
+            return {
+                "file_name": xml_doc.file_name,
+                "entry_name": xml_doc.entry_name,
+                "status": "ignored",
+                "reason": f"Emitida antes del {settings.MIN_ISSUE_DATE}",
             }
 
         if persist:

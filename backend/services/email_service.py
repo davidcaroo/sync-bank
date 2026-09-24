@@ -97,6 +97,7 @@ async def check_emails(search_criteria: str = "UNSEEN"):
         "auto_caused": 0,
         "auto_pending": 0,
         "already_in_alegra": 0,
+        "out_of_range": 0,
         "duplicates": 0,
         "invalid": 0,
         "errors": 0,
@@ -224,6 +225,8 @@ async def check_emails(search_criteria: str = "UNSEEN"):
                                 await _try_auto_causacion(str(factura_id), summary)
                         elif status_result == "duplicate":
                             summary["duplicates"] += 1
+                        elif status_result == "ignored":
+                            summary["out_of_range"] += 1
                         elif status_result == "invalid":
                             summary["invalid"] += 1
                             has_errors = True

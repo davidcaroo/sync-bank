@@ -4,6 +4,7 @@ from typing import Any
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
+from config import settings
 from repositories.database import connection, transaction
 from services.provider_mapping.normalization import normalize_nit
 
@@ -136,7 +137,11 @@ def save_factura(
 
 def get_facturas_stats() -> list[dict[str, Any]]:
     with connection() as conn:
-        return conn.execute("select estado, created_at from facturas").fetchall()
+        return conn.execute(
+            "select estado, created_at from facturas "
+            "where fecha_emision is null or fecha_emision >= %s",
+            (settings.MIN_ISSUE_DATE,),
+        ).fetchall()
 
 
 def get_facturas_paginated(
@@ -148,8 +153,8 @@ def get_facturas_paginated(
     desde: str | None = None,
     hasta: str | None = None,
 ) -> QueryResult:
-    clauses: list[str] = []
-    params: list[Any] = []
+    clauses: list[str] = ["(f.fecha_emision is null or f.fecha_emision >= %s)"]
+    params: list[Any] = [settings.MIN_ISSUE_DATE]
     for clause, value in (
         ("f.estado = %s", estado),
         ("f.nombre_proveedor ilike %s", f"%{proveedor}%" if proveedor else None),
