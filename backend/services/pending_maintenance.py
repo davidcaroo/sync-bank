@@ -26,9 +26,12 @@ async def _rule_for(nit: str, nombre: str | None, cache: dict) -> dict | None:
     if nit in cache:
         return cache[nit]
     config = await run_in_executor(lambda: get_config_cuenta(nit))
+    computed = None
     if not config or config.get("source") != "manual":
         # Relearn from the learning window; manual rules are never touched.
-        await provider_mapping_service.compute_and_save_mapping(nit, nombre)
+        computed = await provider_mapping_service.compute_and_save_mapping(
+            nit, nombre
+        )
         config = await run_in_executor(lambda: get_config_cuenta(nit))
     rule = None
     if config and config.get("id_cuenta_alegra"):
@@ -42,11 +45,13 @@ async def _rule_for(nit: str, nombre: str | None, cache: dict) -> dict | None:
         hint = await provider_mapping_service.suggest_mapping_from_history(
             nit, min_occurrences=1, min_share=0.6
         )
+        if not hint and (computed or {}).get("source") == "sugerida":
+            hint = computed
         if hint and hint.get("cuenta"):
             rule = {
                 "cuenta": hint["cuenta"],
                 "centro": hint.get("centro_costo"),
-                "source": "historical",
+                "source": "sugerida" if hint.get("source") == "sugerida" else "historical",
                 "confidence": float(hint.get("confidence") or 0.0),
             }
     cache[nit] = rule

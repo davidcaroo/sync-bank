@@ -9,7 +9,7 @@ class DummyExtractor:
         self._counter = counter
         self._total = total
 
-    async def get_account_counts(self, nit_proveedor: str):
+    async def get_account_counts(self, nit_proveedor: str, **kwargs):
         return self._counter, self._total
 
 
@@ -72,3 +72,32 @@ async def test_history_suggestion_works_with_one_prior_causation():
 
     assert suggestion["cuenta"] == "5105"
     assert suggestion["centro_costo"] == "12"
+
+
+@pytest.mark.asyncio
+async def test_weak_alegra_history_becomes_a_suggestion_not_a_rule():
+    service = ProviderMappingService()
+    service._historical = DummyExtractor(Counter(), 0)
+    service._persistor = DummyPersistor()
+    service._alegra = DummyExtractor(
+        Counter({("5378", "7"): 17, ("5254", "7"): 3, ("5290", "7"): 7}), 27
+    )
+
+    result = await service.compute_and_save_mapping("900033527")
+
+    assert result["source"] == "sugerida" and result["saved"] is False
+    assert result["cuenta"] == "5378" and result["centro_costo"] == "7"
+    assert service._persistor.saved == []
+
+
+@pytest.mark.asyncio
+async def test_no_suggestion_when_no_account_reaches_40_percent():
+    service = ProviderMappingService()
+    service._historical = DummyExtractor(Counter(), 0)
+    service._persistor = DummyPersistor()
+    service._alegra = DummyExtractor(
+        Counter({("5378", "7"): 10, ("5254", "7"): 10, ("5290", "7"): 10, ("5100", "7"): 10}),
+        40,
+    )
+
+    assert await service.compute_and_save_mapping("900033527") is None

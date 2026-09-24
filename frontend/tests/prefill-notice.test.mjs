@@ -25,3 +25,9 @@ test('causation stays blocked while any item lacks an account', () => {
   assert.equal(hasMissingAccount([item(), { cuenta_contable_alegra: null }]), true)
   assert.equal(hasMissingAccount([item()]), false)
 })
+
+test('a weak suggestion warns to verify and shows its confidence', () => {
+  const notice = describePrefill([item({ prefill_source: 'sugerida', confidence: 0.63 })])
+  assert.equal(notice.tone, 'warning')
+  assert.match(notice.text, /baja confianza \(63 %\)/)
+})

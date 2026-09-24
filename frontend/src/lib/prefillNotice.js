@@ -23,6 +23,15 @@ export function describePrefill(items) {
       text: 'Clasificación sugerida por regla manual. Revisa cuenta y centro antes de causar.',
     }
   }
+  if (source === 'sugerida') {
+    const percent = Number.isFinite(Number(confidence)) && confidence !== null
+      ? ` (${Math.round(Number(confidence) * 100)} %)`
+      : ''
+    return {
+      tone: 'warning',
+      text: `Sugerencia de baja confianza${percent}: es la cuenta más usada con este proveedor, sin ser mayoría clara. Verifica cuenta y centro antes de causar.`,
+    }
+  }
   if (LEARNED_SOURCES.has(source)) {
     const percent = Number.isFinite(Number(confidence)) && confidence !== null
       ? ` (${Math.round(Number(confidence) * 100)} %)`

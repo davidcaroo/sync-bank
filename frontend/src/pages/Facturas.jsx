@@ -369,6 +369,7 @@ export default function Facturas() {
   const normalizePreviewSource = (source) => {
     if (source === 'config') return 'Configuración'
     if (source === 'historical') return 'Historial'
+    if (source === 'sugerida') return 'Sugerida (baja confianza)'
     if (source === 'none') return 'Sin sugerencia'
     return source || 'Sin sugerencia'
   }

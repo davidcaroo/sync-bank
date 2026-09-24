@@ -193,6 +193,22 @@ class ProviderMappingService:
                     },
                 }
 
+            # Not strong enough to become a rule: offer it as a low-confidence
+            # suggestion. Never persisted, never auto-caused.
+            weak = evaluate_account_choice(
+                counter, total, min_occurrences=2, min_share=0.4
+            )
+            if weak:
+                return {
+                    "nit": nit_proveedor,
+                    "cuenta": weak["cuenta"],
+                    "centro_costo": weak["centro_costo"],
+                    "confidence": weak["share"],
+                    "saved": False,
+                    "source": "sugerida",
+                    "metrics": {"total": weak["total"]},
+                }
+
         return None
 
     async def suggest_mapping_from_history(

@@ -78,7 +78,7 @@ class IngestionProcessor:
                         )
                     )
                 else:
-                    await provider_mapping_service.compute_and_save_mapping(
+                    computed = await provider_mapping_service.compute_and_save_mapping(
                         factura.nit_proveedor, factura.nombre_proveedor
                     )
                     config = await self._provider_config_repository.get_config_cuenta(
@@ -92,6 +92,11 @@ class IngestionProcessor:
                                 min_share=0.6,
                             )
                         )
+                        if (
+                            not historical_hint
+                            and (computed or {}).get("source") == "sugerida"
+                        ):
+                            historical_hint = computed
             except Exception:
                 config = await self._provider_config_repository.get_config_cuenta(
                     factura.nit_proveedor
@@ -114,7 +119,11 @@ class IngestionProcessor:
             elif historical_hint and historical_hint.get("cuenta"):
                 cuenta_to_save = historical_hint.get("cuenta")
                 centro_to_save = historical_hint.get("centro_costo")
-                prefill_source = "historical"
+                prefill_source = (
+                    "sugerida"
+                    if historical_hint.get("source") == "sugerida"
+                    else "historical"
+                )
                 try:
                     confidence = float(historical_hint.get("confidence") or 0.0)
                 except Exception:
