@@ -26,7 +26,8 @@ async def _rule_for(nit: str, nombre: str | None, cache: dict) -> dict | None:
     if nit in cache:
         return cache[nit]
     config = await run_in_executor(lambda: get_config_cuenta(nit))
-    if not config:
+    if not config or config.get("source") != "manual":
+        # Relearn from the learning window; manual rules are never touched.
         await provider_mapping_service.compute_and_save_mapping(nit, nombre)
         config = await run_in_executor(lambda: get_config_cuenta(nit))
     rule = None

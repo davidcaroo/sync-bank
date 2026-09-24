@@ -1,6 +1,8 @@
 from collections import Counter
 import httpx
 
+from config import settings
+
 from services.alegra_service import alegra_service
 from repositories.factura_repository import list_confirmed_provider_mappings
 from repositories.db_utils import run_in_executor
@@ -59,6 +61,8 @@ class AlegraExtractor:
                     "start": page * page_size,
                     "limit": page_size,
                     "client_id": provider_id,
+                    "order_field": "date",
+                    "order_direction": "DESC",
                 }
                 res = await client.get(
                     f"{alegra_service.base_url}/bills",
@@ -73,7 +77,11 @@ class AlegraExtractor:
                 if not isinstance(bills, list) or not bills:
                     break
 
+                reached_older = False
                 for bill in bills:
+                    if str(bill.get("date") or "9999") < settings.LEARNING_START_DATE:
+                        reached_older = True
+                        continue
                     purchases = bill.get("purchases") or {}
                     categories = purchases.get("categories") or []
                     accounts = {
@@ -92,7 +100,7 @@ class AlegraExtractor:
                     if bills_seen >= max_bills:
                         return counter, total
 
-                if len(bills) < page_size:
+                if len(bills) < page_size or reached_older:
                     break
 
         return counter, total

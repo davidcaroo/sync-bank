@@ -651,12 +651,16 @@ class AlegraClient:
             return None
 
         for page in range(max_pages):
+            # Alegra ignores "provider" (only client_id filters) and its default
+            # order is arbitrary, so ask for newest first.
             params = {
                 "start": page * 30,
                 "limit": 30,
+                "order_field": "date",
+                "order_direction": "DESC",
             }
             if provider_id:
-                params["provider"] = provider_id
+                params["client_id"] = provider_id
 
             res = await client.get(
                 f"{self.base_url}/bills", params=params, headers=self.headers
@@ -678,7 +682,9 @@ class AlegraClient:
                 ):
                     return bill
 
-            if len(bills) < 30:
+            if len(bills) < 30 or all(
+                str(b.get("date") or "9999") < settings.MIN_ISSUE_DATE for b in bills
+            ):
                 break
 
         return None

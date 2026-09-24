@@ -260,6 +260,7 @@ def list_confirmed_provider_mappings(nit_proveedor: str) -> list[dict[str, Any]]
             from facturas f
             join items_factura i on i.factura_id = f.id
             where regexp_replace(coalesce(f.nit_proveedor, ''), '\D', '', 'g') = %s
+              and (f.fecha_emision is null or f.fecha_emision >= %s)
               and exists (
                   select 1 from causaciones c
                   where c.factura_id = f.id and c.estado = 'exitoso'
@@ -267,7 +268,7 @@ def list_confirmed_provider_mappings(nit_proveedor: str) -> list[dict[str, Any]]
             group by f.id
             order by f.created_at
             """,
-            (nit,),
+            (nit, settings.LEARNING_START_DATE),
         ).fetchall()
 
 

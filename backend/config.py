@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     SESSION_SECRET: str | None = None
     COMPANY_NIT: str | None = None
     MIN_ISSUE_DATE: str = "2026-09-01"
+    LEARNING_START_DATE: str = "2026-01-01"
 
     GOOGLE_CLIENT_ID: str | None = None
     GOOGLE_CLIENT_SECRET: str | None = None
