@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { KpiCard, StatusBadge } from '../components/DashboardBase';
 import {
   IconFileCheck as FileCheck,
@@ -17,6 +17,7 @@ import {
   triggerProcesoManual,
 } from '../lib/api';
 import { useToast } from '../components/ToastProvider';
+import { acceptedJob, describeJob, isActiveJob, POLL_MS } from '../lib/syncJob';
 
 export default function Dashboard() {
   const toast = useToast();
@@ -26,6 +27,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [lastSync, setLastSync] = useState(null);
   const [lastSyncSummary, setLastSyncSummary] = useState(null);
+  const [job, setJob] = useState(null);
+  const wasActive = useRef(false);
   const [error, setError] = useState(null);
 
   const fetchStats = async () => {
@@ -49,6 +52,7 @@ export default function Dashboard() {
   const fetchStatus = async () => {
     if (!isApiConfigured) return;
     const response = await getProcesoStatus();
+    setJob(response.data?.job || null);
     setLastSync(response.data?.last_execution || null);
     setLastSyncSummary(response.data?.summary || null);
   };
@@ -58,36 +62,37 @@ export default function Dashboard() {
     try {
       setError(null);
       const response = await triggerProcesoManual();
-      await fetchStats();
-      await fetchRecent();
-      await fetchStatus();
-
-      const result = response?.data || {};
-      const summary = result.summary || {};
-      setLastSyncSummary(summary);
-      const created = Number(summary.created || 0);
-      const duplicates = Number(summary.duplicates || 0);
-      const invalid = Number(summary.invalid || 0);
-      const errors = Number(summary.errors || 0);
-      const xmlExtracted = Number(summary.xml_extracted || 0);
-
-      if (result.status === 'partial' || errors > 0) {
-        toast.warning(
-          `Sincronización parcial: ${created} creadas, ${duplicates} duplicadas, ${invalid} inválidas, ${errors} errores.`
-        );
-      } else if (created === 0 && duplicates === 0 && xmlExtracted === 0) {
-        toast.info('Sincronización completada sin XML nuevos procesables.');
-      } else {
-        toast.success(
-          `Sincronización completada: ${created} creadas, ${duplicates} duplicadas, ${invalid} inválidas.`
-        );
-      }
+      setJob(acceptedJob(response));
+      toast.info(
+        response?.data?.created === false
+          ? 'Ya hay una sincronización en curso; se sigue esa.'
+          : 'Sincronización en cola.'
+      );
     } catch {
       setError('No se pudo sincronizar con el backend.');
       toast.error('Falló la sincronización manual de emails.');
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    const active = isActiveJob(job);
+    if (wasActive.current && !active && job) {
+      const view = describeJob(job);
+      const notify = { success: toast.success, warning: toast.warning, danger: toast.error }[view.tone];
+      (notify || toast.info)(`Sincronización ${view.label.toLowerCase()}: ${view.detail}`);
+      fetchStats().catch(() => {});
+      fetchRecent().catch(() => {});
+    }
+    wasActive.current = active;
+    if (!active) return undefined;
+    const timer = setInterval(() => {
+      fetchStatus().catch(() => {});
+    }, POLL_MS);
+    return () => clearInterval(timer);
+    // ponytail: polling is keyed to the persisted job, not to the handlers' identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, job?.status]);
 
   const load = async () => {
     try {
@@ -115,6 +120,11 @@ export default function Dashboard() {
           <h1 className="page-heading-title">Resumen general</h1>
           <p className="page-heading-sub">
             Visibilidad inmediata sobre recepción, revisión y causación.
+            {job && (
+              <span className="text-muted" style={{ marginLeft: '0.5rem' }}>
+                · Sincronización: {describeJob(job).label} — {describeJob(job).detail}
+              </span>
+            )}
             {lastSync && (
               <span className="text-muted" style={{ marginLeft: '0.5rem' }}>
                 · Última sincronización: {new Date(lastSync).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
@@ -124,16 +134,16 @@ export default function Dashboard() {
         </div>
         <button
           onClick={triggerProcess}
-          disabled={loading}
+          disabled={loading || isActiveJob(job)}
           className="btn-primary"
           id="btn-sync-emails"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           <RefreshCw 
             size={16} 
-            style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} 
+            style={{ animation: loading || isActiveJob(job) ? 'spin 1s linear infinite' : 'none' }} 
           />
-          {loading ? 'Sincronizando…' : 'Sincronizar correos'}
+          {loading || isActiveJob(job) ? 'Sincronizando…' : 'Sincronizar correos'}
         </button>
       </div>
 
