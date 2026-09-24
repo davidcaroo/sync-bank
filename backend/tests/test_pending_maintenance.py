@@ -53,3 +53,20 @@ async def test_scheduled_run_does_nothing_while_a_sweep_is_running(monkeypatch):
     monkeypatch.setattr(pending_maintenance, "_run", boom)
 
     await pending_maintenance.run_scheduled()
+
+
+def test_scheduled_sweep_only_covers_the_last_60_days():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    rows = [
+        {"id": "new", "fecha_emision": now - timedelta(days=5)},
+        {"id": "edge", "fecha_emision": (now - timedelta(days=59)).isoformat()},
+        {"id": "old", "fecha_emision": now - timedelta(days=61)},
+        {"id": "naive-old", "fecha_emision": (now - timedelta(days=90)).replace(tzinfo=None)},
+        {"id": "no-date", "fecha_emision": None},
+    ]
+
+    kept = [r["id"] for r in pending_maintenance._recent(rows)]
+
+    assert kept == ["new", "edge", "no-date"]

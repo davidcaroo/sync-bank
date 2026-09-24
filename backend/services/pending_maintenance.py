@@ -1,5 +1,8 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
+
+from dateutil import parser as date_parser
 
 from repositories.config_repository import get_config_cuenta
 from repositories.db_utils import run_in_executor
@@ -20,6 +23,22 @@ state = {
     "errores": 0,
 }
 _task: asyncio.Task | None = None
+SCHEDULED_WINDOW_DAYS = 60
+
+
+def _recent(rows: list, days: int = SCHEDULED_WINDOW_DAYS) -> list:
+    """Rows emitted in the last `days`; rows without a date are kept."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    kept = []
+    for row in rows:
+        issued = row.get("fecha_emision")
+        if isinstance(issued, str):
+            issued = date_parser.parse(issued)
+        if issued and issued.tzinfo is None:
+            issued = issued.replace(tzinfo=timezone.utc)
+        if not issued or issued >= cutoff:
+            kept.append(row)
+    return kept
 
 
 async def _rule_for(
@@ -111,6 +130,8 @@ async def _run(relearn: bool) -> None:
             page=1, page_size=500, estado="pendiente"
         )
         rows = res.data or []
+        if not relearn:
+            rows = _recent(rows)
         state["total"] = len(rows)
         for row in rows:
             try:
