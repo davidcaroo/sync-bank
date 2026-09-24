@@ -58,7 +58,7 @@ class AlegraExtractor:
                 params = {
                     "start": page * page_size,
                     "limit": page_size,
-                    "provider": provider_id,
+                    "client_id": provider_id,
                 }
                 res = await client.get(
                     f"{alegra_service.base_url}/bills",
@@ -69,7 +69,7 @@ class AlegraExtractor:
                     break
 
                 data = res.json()
-                bills = data.get("data") or data
+                bills = data.get("data") if isinstance(data, dict) else data
                 if not isinstance(bills, list) or not bills:
                     break
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
+from services import pending_maintenance
 from services.factura_service import factura_service
 from services.pdf_extraction_service import PdfExtractionError, extraer_pdf_from_bytes
 from services.pdf_ingestion_service import pdf_ingestion_service
@@ -193,6 +194,18 @@ async def reconciliar_pendientes_alegra():
     Alegra's bills to find ones already causadas there but not reflected
     locally. Writes nothing."""
     return await factura_service.reconciliar_pendientes()
+
+
+@router.post("/mantenimiento/pendientes")
+async def mantenimiento_pendientes():
+    """Background sweep over pending invoices: ignore DIAN events, mark those Alegra
+    already has, prefill account/cost center from the provider rule."""
+    return pending_maintenance.start()
+
+
+@router.get("/mantenimiento/pendientes")
+async def estado_mantenimiento_pendientes():
+    return dict(pending_maintenance.state)
 
 
 @router.post("/reconciliar-alegra/aplicar")

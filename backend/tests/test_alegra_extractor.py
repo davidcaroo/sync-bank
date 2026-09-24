@@ -63,3 +63,33 @@ async def test_alegra_extractor_votes_one_pair_per_bill(monkeypatch):
     assert total == 2
     assert counter[("6001", "12")] == 1
     assert counter[("6001", None)] == 1
+
+
+@pytest.mark.asyncio
+async def test_alegra_extractor_filters_by_client_id_and_accepts_a_bare_list(monkeypatch):
+    seen = {}
+
+    class ListClient(FakeClient):
+        async def get(self, url, params=None, **kwargs):
+            seen.update(params)
+            return FakeResponse(
+                200,
+                [{"costCenter": {"id": 7}, "purchases": {"categories": [{"id": "5290"}]}}],
+            )
+
+    monkeypatch.setattr(
+        "services.provider_mapping.extractor.httpx.AsyncClient", ListClient
+    )
+
+    async def fake_find_provider(*args, **kwargs):
+        return {"id": "641"}
+
+    monkeypatch.setattr(
+        "services.provider_mapping.extractor.alegra_service.find_provider_contact_by_nit",
+        fake_find_provider,
+    )
+
+    counter, total = await AlegraExtractor().get_account_counts("9001", max_pages=1)
+
+    assert seen["client_id"] == "641" and "provider" not in seen
+    assert total == 1 and counter[("5290", "7")] == 1

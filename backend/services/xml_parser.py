@@ -28,6 +28,10 @@ def _to_float(value: str | None, default: float = 0.0) -> float:
         return default
 
 
+class DianEventError(ValueError):
+    """DIAN event (acuse, recibo...) wrapped like an invoice; it is not an invoice."""
+
+
 class DIANParser:
     def __init__(self) -> None:
         self.namespaces = {
@@ -40,6 +44,8 @@ class DIANParser:
     def parse(self, xml_content: str) -> FacturaDIAN:
         tree = etree.fromstring(xml_content.encode("utf-8"))
         tree = self._unwrap_attached_document(tree)
+        if etree.QName(tree).localname == "ApplicationResponse":
+            raise DianEventError("Documento de evento DIAN, no es una factura")
 
         cufe = self._get_text(tree, "//cbc:UUID") or "SIN-CUFE"
         numero = self._get_text(tree, "//cbc:ID") or "SIN-NUMERO"

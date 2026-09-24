@@ -80,3 +80,22 @@ def test_line_without_tax_node_keeps_legacy_rate_when_header_declares_iva():
     factura = parse_xml_dian(_invoice_xml())
 
     assert factura.items[0].iva_porcentaje == 19
+
+
+def test_dian_event_wrapped_as_attached_document_is_not_an_invoice():
+    import pytest
+
+    from services.xml_parser import DianEventError, parse_xml_dian
+
+    xml = (
+        '<AttachedDocument xmlns="urn:oasis:names:specification:ubl:schema:xsd:AttachedDocument-2"'
+        ' xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"'
+        ' xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">'
+        "<cac:Attachment><cac:ExternalReference><cbc:Description><![CDATA["
+        '<ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">'
+        "<cbc:ID>1</cbc:ID></ApplicationResponse>"
+        "]]></cbc:Description></cac:ExternalReference></cac:Attachment></AttachedDocument>"
+    )
+
+    with pytest.raises(DianEventError):
+        parse_xml_dian(xml)
