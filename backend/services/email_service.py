@@ -6,7 +6,7 @@ import logging
 import re
 from email.header import decode_header
 from config import settings
-from repositories.logs_repository import upsert_email_log
+from repositories.logs_repository import is_email_processed, upsert_email_log
 from repositories.db_utils import run_in_executor
 from services.auto_causacion_service import auto_causacion_service
 from services.factura_service import factura_service
@@ -100,6 +100,7 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
         "already_in_alegra": 0,
         "out_of_range": 0,
         "ignored": 0,
+        "already_processed": 0,
         "duplicates": 0,
         "invalid": 0,
         "errors": 0,
@@ -158,6 +159,13 @@ async def check_emails(search_criteria: str = "UNSEEN", on_progress=None):
                 continue
 
             msg = email.message_from_bytes(data[0][1])
+
+            # Same mail seen again (a rescan): nothing to extract, skip the slow work.
+            if await run_in_executor(lambda: is_email_processed(msg["Message-ID"])):
+                summary["already_processed"] += 1
+                summary["messages_processed"] += 1
+                await asyncio.to_thread(mail.store, num, "+FLAGS", "\Seen")
+                continue
 
             email_log = {
                 "mensaje_id": msg["Message-ID"],

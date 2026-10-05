@@ -44,3 +44,16 @@ def list_logs_paginated(
             (*params, page_size, offset),
         ).fetchall()
     return rows, count
+
+
+def is_email_processed(message_id: str | None) -> bool:
+    if not message_id:
+        return False
+    with connection() as conn:
+        return (
+            conn.execute(
+                "select 1 from logs_email where mensaje_id = %s and estado = 'procesado'",
+                (message_id,),
+            ).fetchone()
+            is not None
+        )

@@ -176,3 +176,25 @@ async def test_the_scheduler_only_enqueues_and_never_reads_the_mailbox(jobs, mon
     await sync_job_service.enqueue_scheduled()
 
     assert calls == [] and jobs.jobs[0]["requested_by"] == "scheduler"
+
+
+def test_the_mailbox_filter_narrows_the_search_to_zip_attachments(monkeypatch):
+    monkeypatch.setattr(sync_job_service.settings, "MIN_ISSUE_DATE", "2026-09-01")
+    monkeypatch.setattr(
+        sync_job_service.settings, "IMAP_SEARCH_FILTER", "has:attachment filename:zip"
+    )
+
+    assert (
+        sync_job_service._criteria("scheduler")
+        == 'UNSEEN X-GM-RAW "has:attachment filename:zip"'
+    )
+    assert (
+        sync_job_service._criteria("manual")
+        == 'SINCE 01-Sep-2026 X-GM-RAW "has:attachment filename:zip"'
+    )
+
+
+def test_without_a_filter_the_criteria_are_unchanged(monkeypatch):
+    monkeypatch.setattr(sync_job_service.settings, "IMAP_SEARCH_FILTER", "")
+
+    assert sync_job_service._criteria("scheduler") == "UNSEEN"

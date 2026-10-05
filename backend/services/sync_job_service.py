@@ -22,8 +22,11 @@ def _criteria(requested_by: str) -> str:
     mails a person already opened); scheduled runs only read unseen mail."""
     if requested_by == "manual":
         since = date.fromisoformat(settings.MIN_ISSUE_DATE)
-        return f"SINCE {since.day:02d}-{_MONTHS[since.month - 1]}-{since.year}"
-    return "UNSEEN"
+        base = f"SINCE {since.day:02d}-{_MONTHS[since.month - 1]}-{since.year}"
+    else:
+        base = "UNSEEN"
+    extra = settings.IMAP_SEARCH_FILTER.strip().replace('"', "")
+    return f'{base} X-GM-RAW "{extra}"' if extra else base
 
 
 async def enqueue(requested_by: str) -> dict:

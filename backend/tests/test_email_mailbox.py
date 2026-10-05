@@ -32,6 +32,11 @@ def test_mailbox_names_are_quoted_only_when_needed(name, expected):
     assert _mailbox_arg(name) == expected
 
 
+@pytest.fixture(autouse=True)
+def no_processed_mail(monkeypatch):
+    monkeypatch.setattr(email_service, "is_email_processed", lambda message_id: False)
+
+
 class FakeImap:
     instances = []
 
@@ -283,3 +288,36 @@ async def test_imap_work_runs_off_the_event_loop_thread(monkeypatch):
     await email_service.check_emails()
 
     assert threads and all(t != main_thread for t in threads)
+
+
+@pytest.mark.asyncio
+async def test_a_mail_already_processed_is_not_processed_again(monkeypatch):
+    instances = []
+
+    class Tracked(OneMessageImap):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            instances.append(self)
+
+    async def no_context(*, apply_ai):
+        return {}
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("an already processed mail must not be extracted again")
+
+    monkeypatch.setattr(email_service.imaplib, "IMAP4_SSL", Tracked)
+    monkeypatch.setattr(
+        email_service.ingestion_service, "build_prefill_context", no_context
+    )
+    monkeypatch.setattr(
+        email_service.ingestion_service,
+        "extract_xml_documents_from_attachment",
+        forbidden,
+    )
+    monkeypatch.setattr(email_service, "is_email_processed", lambda message_id: True)
+    monkeypatch.setattr(email_service, "upsert_email_log", lambda log: None)
+
+    summary = await email_service.check_emails()
+
+    assert summary["already_processed"] == 1
+    assert instances[0].seen == [b"1"]

@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     IMAP_HOST: str = "imap.gmail.com"
     IMAP_PORT: int = 993
     IMAP_MAILBOX: str = "inbox"
+    # Gmail search (X-GM-RAW) added to every sync, e.g. "has:attachment filename:zip".
+    IMAP_SEARCH_FILTER: str = ""
     IMAP_USER: str
     IMAP_PASS: str
 
