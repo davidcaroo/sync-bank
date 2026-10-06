@@ -1,11 +1,12 @@
 import asyncio
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from config import settings
 from repositories import sync_job_repository as repo
 from repositories.db_utils import run_in_executor
 from services.email_service import check_emails
+from services.notifier import notify
 
 logger = logging.getLogger("sync_jobs")
 
@@ -62,6 +63,13 @@ async def _execute(job: dict) -> None:
     status = await run_in_executor(lambda: repo.retry_or_fail_job(job["id"], error))
     if status == "pending":
         await asyncio.sleep(RETRY_DELAY_SECONDS)
+    else:
+        await notify(
+            "sync-failed",
+            "La sincronizacion del correo fallo",
+            f"La lectura del correo fallo tras {job['max_attempts']} intentos.\n\n"
+            f"Ultimo error: {error}\n\nNo entraran facturas nuevas hasta que se resuelva.",
+        )
 
 
 async def run_pending() -> None:
@@ -70,6 +78,21 @@ async def run_pending() -> None:
         if not job:
             return
         await _execute(job)
+
+
+async def check_health() -> None:
+    """Watchdog: alert if no sync has succeeded for SYNC_STALE_HOURS (runner or scheduler stuck)."""
+    last = await run_in_executor(lambda: repo.last_success_at())
+    if last is None:
+        return
+    hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+    if hours > settings.SYNC_STALE_HOURS:
+        await notify(
+            "sync-stale",
+            "La sincronizacion no corre",
+            f"Hace {hours:.1f} horas que ninguna sincronizacion del correo termina bien "
+            f"(limite: {settings.SYNC_STALE_HOURS} h). Revisa el panel y Railway.",
+        )
 
 
 async def recover() -> None:

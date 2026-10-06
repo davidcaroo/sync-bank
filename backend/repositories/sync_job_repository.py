@@ -111,3 +111,12 @@ def get_sync_status() -> dict[str, Any] | None:
             "select * from sync_jobs where job_type = %s order by created_at desc limit 1",
             (JOB_TYPE,),
         ).fetchone()
+
+
+def last_success_at():
+    with connection() as conn:
+        return conn.execute(
+            "select max(finished_at) as at from sync_jobs "
+            "where job_type = %s and status = 'succeeded'",
+            (JOB_TYPE,),
+        ).fetchone()["at"]

@@ -198,3 +198,61 @@ def test_without_a_filter_the_criteria_are_unchanged(monkeypatch):
     monkeypatch.setattr(sync_job_service.settings, "IMAP_SEARCH_FILTER", "")
 
     assert sync_job_service._criteria("scheduler") == "UNSEEN"
+
+
+@pytest.mark.asyncio
+async def test_a_job_that_exhausts_its_retries_sends_an_alert(jobs, monkeypatch):
+    alerts = []
+
+    async def notify(key, subject, body):
+        alerts.append((key, subject, body))
+
+    monkeypatch.setattr(sync_job_service, "notify", notify)
+    _mailbox(monkeypatch, [{"errors": 1, "fatal_error": "imap down"}])
+    await sync_job_service.enqueue("scheduler")
+
+    await sync_job_service.run_pending()
+
+    assert len(alerts) == 1 and "imap down" in alerts[0][2]
+
+
+@pytest.mark.asyncio
+async def test_a_job_that_recovers_on_retry_sends_no_alert(jobs, monkeypatch):
+    alerts = []
+
+    async def notify(key, subject, body):
+        alerts.append(key)
+
+    monkeypatch.setattr(sync_job_service, "notify", notify)
+    _mailbox(monkeypatch, [{"errors": 1, "fatal_error": "blip"}, {"created": 1}])
+    await sync_job_service.enqueue("scheduler")
+
+    await sync_job_service.run_pending()
+
+    assert alerts == []
+
+
+@pytest.mark.asyncio
+async def test_the_watchdog_alerts_when_no_sync_succeeded_for_hours(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    alerts = []
+
+    async def notify(key, subject, body):
+        alerts.append(key)
+
+    monkeypatch.setattr(sync_job_service, "notify", notify)
+    monkeypatch.setattr(sync_job_service.settings, "SYNC_STALE_HOURS", 3)
+    now = datetime.now(timezone.utc)
+
+    monkeypatch.setattr(sync_job_service.repo, "last_success_at", lambda: now - timedelta(hours=1))
+    await sync_job_service.check_health()
+    assert alerts == []
+
+    monkeypatch.setattr(sync_job_service.repo, "last_success_at", lambda: now - timedelta(hours=4))
+    await sync_job_service.check_health()
+    assert alerts == ["sync-stale"]
+
+    monkeypatch.setattr(sync_job_service.repo, "last_success_at", lambda: None)
+    await sync_job_service.check_health()
+    assert alerts == ["sync-stale"]

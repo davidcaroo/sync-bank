@@ -262,3 +262,31 @@ def test_autocausation_accepts_the_company_nit_with_a_verification_digit(monkeyp
     monkeypatch.setattr(settings, "COMPANY_NIT", "900741732-1")
 
     assert evaluate_auto_causacion(VALID_FACTURA, VALID_CONFIG).eligible
+
+
+@pytest.mark.asyncio
+async def test_an_opted_in_invoice_that_cannot_be_caused_sends_an_alert(monkeypatch):
+    from services import auto_causacion_service as module
+
+    alerts = []
+
+    async def notify(key, subject, body):
+        alerts.append((key, body))
+
+    monkeypatch.setattr(module, "notify", notify)
+    service = AutoCausacionService(
+        factura_repository=MagicMock(
+            get_factura_with_items=AsyncMock(
+                return_value={**VALID_FACTURA, "total": 0}
+            ),
+            get_successful_causacion=AsyncMock(return_value=None),
+        ),
+        config_repository=MagicMock(get_config_cuenta=AsyncMock(return_value=VALID_CONFIG)),
+        causacion_repository=MagicMock(save_causacion=AsyncMock()),
+        factura_service_=MagicMock(),
+    )
+
+    result = await service.try_cause_from_imap_xml("f1")
+
+    assert result["status"] == "pending"
+    assert len(alerts) == 1 and alerts[0][0] == "auto:f1" and "invalid_total" in alerts[0][1]

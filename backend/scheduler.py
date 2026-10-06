@@ -15,6 +15,7 @@ _MAX_CONCURRENCY = 5
 
 def start_scheduler():
     scheduler.add_job(sync_job_service.enqueue_scheduled, "interval", minutes=5)
+    scheduler.add_job(sync_job_service.check_health, "interval", minutes=30)
     scheduler.add_job(
         pending_maintenance.run_scheduled,
         "interval",

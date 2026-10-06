@@ -4,6 +4,7 @@ import pytest
 
 from repositories.database import transaction
 from repositories.sync_job_repository import (
+    last_success_at,
     claim_next_email_sync,
     enqueue_email_sync,
     finish_job,
@@ -124,3 +125,16 @@ def test_jobs_left_running_by_a_restart_go_back_to_the_queue_or_fail():
     status = get_sync_status()
     assert status["status"] == "failed"
     assert "interrumpido" in status["error_message"].lower()
+
+
+def test_last_success_is_the_latest_finished_job_or_none():
+    assert last_success_at() is None
+    job = enqueue_email_sync("manual")["job"]
+    claim_next_email_sync()
+    retry_or_fail_job(job["id"], "x")
+    assert last_success_at() is None
+
+    claim_next_email_sync()
+    finish_job(job["id"], {})
+
+    assert last_success_at() is not None

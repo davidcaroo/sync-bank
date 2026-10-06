@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     IMAP_MAILBOX: str = "inbox"
     # Gmail search (X-GM-RAW) added to every sync, e.g. "has:attachment filename:zip".
     IMAP_SEARCH_FILTER: str = ""
+
+    # Failure alerts by email, sent through the same Gmail account (IMAP_USER/IMAP_PASS).
+    ALERT_EMAILS: str = ""
+    ALERT_COOLDOWN_MINUTES: int = 360
+    SYNC_STALE_HOURS: int = 3
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
     IMAP_USER: str
     IMAP_PASS: str
 

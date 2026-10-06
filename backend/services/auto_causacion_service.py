@@ -13,6 +13,7 @@ from repositories.factura_async_repository import (
 )
 from repositories.ingestion_adapters import SyncProviderConfigRepositoryAdapter
 from services.factura_service import factura_service
+from services.notifier import notify
 from services.provider_mapping.normalization import nit_key, normalize_nit
 
 CENT = Decimal("0.01")
@@ -127,6 +128,12 @@ class AutoCausacionService:
         self._logger = logger or logging.getLogger("auto_causacion")
 
     async def _record_block(self, factura_id: str, reason: str) -> None:
+        await notify(
+            f"auto:{factura_id}",
+            "Una factura no se pudo autocausar",
+            f"La factura {factura_id} tiene regla de autocausacion pero quedo pendiente.\n"
+            f"Motivo: {reason}\n\nRevisala en el panel y causala manualmente.",
+        )
         try:
             await self._causacion_repository.save_causacion(
                 {

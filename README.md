@@ -56,6 +56,10 @@ No se usa IA ni un servicio de clasificación externo: la clasificación contabl
 - **El usuario `admin` con contraseña está deshabilitado** (`PASSWORD_LOGIN_ENABLED=false`). Poner `true` solo como vía de emergencia.
 - **Scripts y monitoreo**: envían el header `X-Admin-Key` con `ADMIN_API_KEY`. Ya no se acepta autenticación Basic.
 
+## 🔔 Alertas por correo
+
+Si `ALERT_EMAILS` (separados por coma) está configurado, el sistema escribe desde `IMAP_USER` cuando: la sincronización falla tras sus 3 intentos, ninguna sincronización termina bien en `SYNC_STALE_HOURS` horas (vigía cada 30 min), o una factura con regla de autocausación queda pendiente. La misma alerta no se repite antes de `ALERT_COOLDOWN_MINUTES`. No avisa si todo el servicio se cae; para eso usa un monitor externo sobre `/healthz`.
+
 ## 🔁 Sincronización durable
 
 - **Trabajos**: cada lectura del correo es una fila de `sync_jobs` con estado `pending` → `running` → `succeeded` o `failed`, progreso y resultado. Solo puede existir un trabajo activo; pedirlo dos veces devuelve el mismo.
