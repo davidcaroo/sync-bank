@@ -16,6 +16,7 @@ from repositories.factura_async_repository import (
 )
 from repositories.db_utils import run_in_executor
 from services.factura_contracts import CausacionRepositoryPort, FacturaRepositoryPort
+from services import advance_service
 from services.alegra_service import alegra_service
 from services.errors import AlegraDuplicateBillError, RemoteAPIError
 from services.ingestion_service import ingestion_service
@@ -716,6 +717,7 @@ class FacturaService:
             await self._factura_repository.update_factura_fields(
                 factura_id, {"estado": "procesado"}
             )
+            advance_service.request_run()
             try:
                 await self._causacion_repository.save_causacion(
                     {

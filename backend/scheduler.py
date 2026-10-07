@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from services import pending_maintenance, sync_job_service
+from services import advance_service, pending_maintenance, sync_job_service
 from services.provider_mapping_service import provider_mapping_service
 
 scheduler = AsyncIOScheduler()
@@ -16,6 +16,9 @@ _MAX_CONCURRENCY = 5
 def start_scheduler():
     scheduler.add_job(sync_job_service.enqueue_scheduled, "interval", minutes=5)
     scheduler.add_job(sync_job_service.check_health, "interval", minutes=30)
+    scheduler.add_job(
+        advance_service.run_scheduled, "interval", minutes=15, max_instances=1, coalesce=True
+    )
     scheduler.add_job(
         pending_maintenance.run_scheduled,
         "interval",

@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     MIN_ISSUE_DATE: str = "2026-09-01"
     LEARNING_START_DATE: str = "2026-01-01"
 
+    # Pay open bills with the provider's advance balance (e.g. DEVISAB tolls). off | dry_run | on
+    AUTO_ADVANCE_MODE: str = "off"
+    AUTO_ADVANCE_NITS: str = ""
+    ADVANCE_NUMBER_TEMPLATE_ID: str = "01H9QVH1E1XM7394S2K2HZDVJW"
+
     MAX_ATTACHMENT_BYTES: int = 20 * 1024 * 1024
     MAX_ZIP_ENTRIES: int = 100
     MAX_ZIP_EXPANDED_BYTES: int = 50 * 1024 * 1024

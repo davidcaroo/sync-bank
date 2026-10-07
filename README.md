@@ -56,6 +56,14 @@ No se usa IA ni un servicio de clasificación externo: la clasificación contabl
 - **El usuario `admin` con contraseña está deshabilitado** (`PASSWORD_LOGIN_ENABLED=false`). Poner `true` solo como vía de emergencia.
 - **Scripts y monitoreo**: envían el header `X-Admin-Key` con `ADMIN_API_KEY`. Ya no se acepta autenticación Basic.
 
+## 💸 Pago con anticipos (DEVISAB)
+
+Para los NIT de `AUTO_ADVANCE_NITS`, el sistema hace lo que hace la contadora en Alegra con **Más acciones → Aplicar anticipos**: paga cada factura abierta (desde `MIN_ISSUE_DATE`) con el saldo de los anticipos del proveedor, la más antigua primero, y la factura queda pagada. Corre justo después de causar y cada 15 minutos.
+
+- **Todo o nada por factura y en orden**: si el saldo no alcanza, se detiene en la primera factura que no cabe y avisa por correo que hay que recargar el anticipo; al registrar la recarga en Alegra se aplica sola.
+- **No duplica**: solo toca facturas abiertas con saldo y verifica en Alegra que quedaron en cero.
+- `AUTO_ADVANCE_MODE`: `off` (por defecto), `dry_run` (solo registra) u `on`. `POST /api/facturas/anticipos/ejecutar` hace un simulacro; con `?simulacro=false` aplica de verdad y exige modo `on`.
+
 ## 🔔 Alertas por correo
 
 Si `ALERT_EMAILS` (separados por coma) está configurado, el sistema escribe desde `IMAP_USER` cuando: la sincronización falla tras sus 3 intentos, ninguna sincronización termina bien en `SYNC_STALE_HOURS` horas (vigía cada 30 min), o una factura con regla de autocausación queda pendiente. La misma alerta no se repite antes de `ALERT_COOLDOWN_MINUTES`. No avisa si todo el servicio se cae; para eso usa un monitor externo sobre `/healthz`.

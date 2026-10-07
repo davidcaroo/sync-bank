@@ -1,7 +1,7 @@
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
-from services import pending_maintenance
+from services import advance_service, pending_maintenance
 from services.factura_service import factura_service
 from services.pdf_extraction_service import PdfExtractionError, extraer_pdf_from_bytes
 from services.pdf_ingestion_service import pdf_ingestion_service
@@ -206,6 +206,18 @@ async def mantenimiento_pendientes():
 @router.get("/mantenimiento/pendientes")
 async def estado_mantenimiento_pendientes():
     return dict(pending_maintenance.state)
+
+
+@router.post("/anticipos/ejecutar")
+async def ejecutar_anticipos(simulacro: bool = True):
+    """Pay open bills of AUTO_ADVANCE_NITS with their advance balance. Simulation by
+    default; a real run needs AUTO_ADVANCE_MODE=on."""
+    if not simulacro and advance_service.settings.AUTO_ADVANCE_MODE != "on":
+        raise HTTPException(
+            status_code=409,
+            detail="Aplicar anticipos esta apagado (AUTO_ADVANCE_MODE distinto de on)",
+        )
+    return await advance_service.run(dry_run=simulacro)
 
 
 @router.post("/reconciliar-alegra/aplicar")
