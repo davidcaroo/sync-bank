@@ -240,8 +240,14 @@ class DIANParser:
         rete_ica = 0.0
         rete_iva = 0.0
 
+        # Some issuers declare each retention in the header AND on every line;
+        # `//` would count it twice. Header wins; lines only when it is absent.
+        base = "/*/cac:WithholdingTaxTotal"
+        if not tree.xpath(base, namespaces=self.namespaces):
+            base = "//cac:InvoiceLine/cac:WithholdingTaxTotal"
+
         withholding_subtotals = tree.xpath(
-            "//cac:WithholdingTaxTotal/cac:TaxSubtotal",
+            f"{base}/cac:TaxSubtotal",
             namespaces=self.namespaces,
         )
         for subtotal_node in withholding_subtotals:
@@ -277,9 +283,7 @@ class DIANParser:
             elif "iva" in scheme_name or scheme_id in {"04", "RETEIVA"}:
                 rete_iva += amount
 
-        withholding_total = self._sum_texts(
-            tree, "//cac:WithholdingTaxTotal/cbc:TaxAmount"
-        )
+        withholding_total = self._sum_texts(tree, f"{base}/cbc:TaxAmount")
         if withholding_total <= 0:
             withholding_total = rete_fuente + rete_ica + rete_iva
 
