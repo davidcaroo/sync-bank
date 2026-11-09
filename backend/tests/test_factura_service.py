@@ -360,3 +360,26 @@ async def test_pending_invoice_missing_in_alegra_stays_pending(monkeypatch):
 
     assert (await service.marcar_si_ya_esta_en_alegra("f1"))["status"] == "pending"
     assert not [event for event in fakes.events if event[0] == "factura"]
+
+
+@pytest.mark.asyncio
+async def test_causar_sends_retentions_reparsed_from_xml_not_stored_values(monkeypatch):
+    from test_xml_parser import _withholding_invoice_xml
+
+    fakes = _CausacionFakes([_item()])
+    fakes.factura.update(
+        rete_fuente=1012095,  # stored before the parser fix: doubled
+        xml_raw=_withholding_invoice_xml(header=True, lines=[506047.50]),
+    )
+    service = _causacion_service(fakes, monkeypatch)
+    sent = {}
+
+    async def crear_bill(factura):
+        sent["rete_fuente"] = factura.rete_fuente
+        return {"id": "bill-1"}
+
+    monkeypatch.setattr("services.factura_service.alegra_service.crear_bill", crear_bill)
+
+    await service.causar_factura("f1")
+
+    assert sent["rete_fuente"] == 506047.50

@@ -311,3 +311,89 @@ def test_flatten_categories_skips_blocked_and_accumulative_accounts():
     ids = {str(item["id"]) for item in client._flatten_categories(payload)}
 
     assert ids == {"5298", "5302"}
+
+
+class _RetentionBillClient(_BillClient):
+    def __init__(self, retentions):
+        super().__init__()
+        self.retentions = retentions
+
+    async def get(self, url, params=None, headers=None):
+        if url.endswith("/retentions"):
+            return _FakeResponse(200, payload=self.retentions)
+        return await super().get(url, params=params, headers=headers)
+
+
+def _fe260(**overrides):
+    fields = {"rete_fuente": 506047.50, **overrides}
+    return FacturaDIAN(
+        cufe="CUFE-FE260",
+        numero_factura="FE260",
+        nit_proveedor="7474113",
+        nombre_proveedor="JULIO CESAR CHARRIS BLANCO",
+        subtotal=14458500,
+        iva=0,
+        total=13952452.50,
+        items=[
+            FacturaItem(
+                descripcion="ARRENDAMIENTO BODEGA M 10",
+                cantidad=1,
+                precio_unitario=14458500,
+                descuento=0,
+                iva_porcentaje=0,
+                total_linea=14458500,
+                cuenta_contable_alegra="5105",
+            )
+        ],
+        **fields,
+    )
+
+
+_ALEGRA_RETENTIONS = [
+    {"id": "3", "name": "Retefuente 2.5%", "type": "FUENTE", "percentage": 2.5, "status": "active"},
+    {"id": "4", "name": "Retefuente 3.5% viejo", "type": "FUENTE", "percentage": 3.5, "status": "inactive"},
+    {"id": "5", "name": "Arrendamientos 3.5%", "type": "FUENTE", "percentage": "3.50", "status": "active"},
+    {"id": "9", "name": "ReteICA 9.66", "type": "ICA", "percentage": 0.966, "status": "active"},
+]
+
+
+@pytest.mark.asyncio
+async def test_bill_payload_carries_retefuente_matched_by_type_and_rate():
+    http = _RetentionBillClient(_ALEGRA_RETENTIONS)
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+
+    await client.crear_bill(_fe260())
+
+    assert http.posted["retentions"] == [{"id": "5", "amount": 506047.5}]
+
+
+@pytest.mark.asyncio
+async def test_bill_payload_carries_reteica_on_subtotal_base():
+    http = _RetentionBillClient(_ALEGRA_RETENTIONS)
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+
+    await client.crear_bill(_fe260(rete_fuente=0, rete_ica=139669.11))
+
+    assert http.posted["retentions"] == [{"id": "9", "amount": 139669.11}]
+
+
+@pytest.mark.asyncio
+async def test_bill_is_not_created_when_alegra_has_no_matching_retention():
+    from services.errors import RemoteAPIError
+
+    http = _RetentionBillClient(_ALEGRA_RETENTIONS[:1])
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+
+    with pytest.raises(RemoteAPIError, match="3.50"):
+        await client.crear_bill(_fe260())
+    assert http.posted is None
+
+
+@pytest.mark.asyncio
+async def test_bill_without_retentions_does_not_query_or_send_them():
+    http = _BillClient()  # answers 404 to /retentions
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+
+    await client.crear_bill(_fe260(rete_fuente=0))
+
+    assert "retentions" not in http.posted

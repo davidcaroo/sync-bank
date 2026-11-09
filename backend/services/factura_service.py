@@ -687,6 +687,8 @@ class FacturaService:
                 )
             )
 
+        # Amounts come from xml_raw, not the stored columns, which may predate a parser fix.
+        factura_data = self._enrich_factura_monetary_fields(factura_data)
         factura_model = FacturaDIAN(
             cufe=factura_data.get("cufe"),
             numero_factura=factura_data.get("numero_factura"),

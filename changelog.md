@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-11-09] - Fix: ReteFuente duplicada y retenciones en el bill de Alegra
+### Corregido
+- El parser DIAN sumaba la retención del encabezado y la de cada línea (`//cac:WithholdingTaxTotal`). Ahora usa la del encabezado y, si no existe, la de las líneas. Caso: FE260 (NIT 7474113), retefuente 1.012.095 en lugar de 506.047,50.
+- Al causar, los montos se toman del XML re-parseado y no de las columnas guardadas.
+
+### Añadido
+- El bill de Alegra lleva `retentions` (ReteFuente, ReteICA, ReteIVA), con la retención activa de Alegra que coincide por tipo y tarifa (`GET /retentions`). Si no hay coincidencia, no se causa y se devuelve un error explícito.
+- `backend/scripts/audit_retenciones.py`: compara los valores guardados contra el XML y muestra el bill de Alegra. Con `--apply` corrige solo la base de datos.
+
 ## [2026-09-17] - Migración del backend a PostgreSQL directo
 
 - Se reemplazó el acceso de servidor mediante Supabase por `psycopg` con pool de conexiones.

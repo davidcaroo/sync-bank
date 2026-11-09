@@ -230,6 +230,7 @@ class AlegraClient:
         self._categories = None
         self._cost_centers = None
         self._taxes = None
+        self._retentions = None
         self._http_client_factory = http_client_factory or (
             lambda: httpx.AsyncClient(timeout=30.0, follow_redirects=True)
         )
@@ -296,6 +297,56 @@ class AlegraClient:
         data = res.json()
         self._cost_centers = data.get("data", data) if isinstance(data, dict) else data
         return self._cost_centers
+
+    async def get_retentions(self, client: httpx.AsyncClient) -> list[dict]:
+        if self._retentions is not None:
+            return self._retentions
+        res = await client.get(
+            f"{self.base_url}/retentions", params={"limit": 30}, headers=self.headers
+        )
+        if res.status_code != 200:
+            raise RemoteAPIError(f"Error Alegra API al listar retenciones: {res.text}")
+        # ponytail: first 30 only (Alegra's page max); paginate if an account has more
+        self._retentions = [
+            row
+            for row in (_extract_list_payload(res.json()) or res.json() or [])
+            if isinstance(row, dict)
+            and str(row.get("status") or "active").lower() == "active"
+        ]
+        return self._retentions
+
+    async def _build_retentions_payload(
+        self, client: httpx.AsyncClient, factura: FacturaDIAN
+    ) -> list[dict]:
+        """Map the invoice's retentions to Alegra retentions by type and rate."""
+        wanted = [
+            ("FUENTE", "ReteFuente", factura.rete_fuente, factura.subtotal),
+            ("ICA", "ReteICA", factura.rete_ica, factura.subtotal),
+            ("IVA", "ReteIVA", factura.rete_iva, factura.iva),
+        ]
+        payload = []
+        for kind, label, amount, base in wanted:
+            amount = _to_float(amount, 0.0)
+            if amount <= 0:
+                continue
+            base = _to_float(base, 0.0)
+            rate = amount / base * 100 if base > 0 else 0.0
+            match = next(
+                (
+                    r
+                    for r in await self.get_retentions(client)
+                    if kind in str(r.get("type") or "").upper()
+                    and abs(_to_float(r.get("percentage"), -1) - rate) <= 0.01
+                ),
+                None,
+            )
+            if match is None:
+                raise RemoteAPIError(
+                    f"No se encontro una retencion activa en Alegra para {label} "
+                    f"{rate:.2f}%. Creala en Alegra o causa la factura manualmente."
+                )
+            payload.append({"id": str(match["id"]), "amount": round(amount, 2)})
+        return payload
 
     async def get_taxes(self, client: httpx.AsyncClient):
         if self._taxes is not None:
@@ -852,6 +903,9 @@ class AlegraClient:
                 "purchases": {"categories": categories_payload},
                 "observations": _build_bill_observations(factura),
             }
+            retentions = await self._build_retentions_payload(client, factura)
+            if retentions:
+                payload["retentions"] = retentions
 
             res = await client.post(
                 f"{self.base_url}/bills", json=payload, headers=self.headers
