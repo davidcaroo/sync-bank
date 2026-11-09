@@ -239,6 +239,7 @@ class DIANParser:
         rete_fuente = 0.0
         rete_ica = 0.0
         rete_iva = 0.0
+        lines: list[dict] = []
 
         # Some issuers declare each retention in the header AND on every line;
         # `//` would count it twice. Header wins; lines only when it is absent.
@@ -272,16 +273,31 @@ class DIANParser:
             )
             amount = _to_float(tax_amount_nodes[0].text if tax_amount_nodes else None)
 
+            percent = _to_float(
+                self._get_text(subtotal_node, "cac:TaxCategory/cbc:Percent")
+                or self._get_text(subtotal_node, "cbc:Percent"),
+                default=-1.0,
+            )
+            if percent < 0:
+                taxable = _to_float(self._get_text(subtotal_node, "cbc:TaxableAmount"))
+                percent = round(amount / taxable * 100, 4) if taxable > 0 else None
+
+            kind = None
             if "ica" in scheme_name or scheme_id in {"08", "ICA"}:
                 rete_ica += amount
+                kind = "ICA"
             elif (
                 "fuente" in scheme_name
                 or "renta" in scheme_name
                 or scheme_id in {"06", "RETEFUENTE"}
             ):
                 rete_fuente += amount
+                kind = "FUENTE"
             elif "iva" in scheme_name or scheme_id in {"04", "RETEIVA"}:
                 rete_iva += amount
+                kind = "IVA"
+            if kind and amount > 0:
+                lines.append({"kind": kind, "percent": percent, "amount": amount})
 
         withholding_total = self._sum_texts(tree, f"{base}/cbc:TaxAmount")
         if withholding_total <= 0:
@@ -295,6 +311,7 @@ class DIANParser:
             "rete_ica": rete_ica,
             "rete_iva": rete_iva,
             "withholding_total": withholding_total,
+            "lines": lines,
         }
 
     def _resolve_total(self, totals: dict, retentions: dict) -> float:
@@ -400,3 +417,10 @@ class DIANParser:
 
 def parse_xml_dian(xml_content: str) -> FacturaDIAN:
     return DIANParser().parse(xml_content)
+
+
+def parse_retention_lines(xml_content: str) -> list[dict]:
+    """Each withholding subtotal as {kind: FUENTE|ICA|IVA, percent, amount}."""
+    p = DIANParser()
+    tree = p._unwrap_attached_document(etree.fromstring(xml_content.encode("utf-8")))
+    return p._extract_retentions(tree)["lines"]

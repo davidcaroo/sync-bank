@@ -397,3 +397,39 @@ async def test_bill_without_retentions_does_not_query_or_send_them():
     await client.crear_bill(_fe260(rete_fuente=0))
 
     assert "retentions" not in http.posted
+
+
+@pytest.mark.asyncio
+async def test_bill_sends_one_retention_per_rate_declared_in_the_xml():
+    from test_xml_parser import _withholding, _withholding_invoice_xml
+
+    xml = _withholding_invoice_xml(header=False, lines=[100.0]).replace(
+        _withholding(100.0), _withholding(250.0, 2.5) + _withholding(400.0, 4)
+    )
+    rets = _ALEGRA_RETENTIONS + [
+        {"id": "7", "name": "Retefuente 4%", "type": "FUENTE", "percentage": 4, "status": "active"}
+    ]
+    http = _RetentionBillClient(rets)
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+
+    await client.crear_bill(_fe260(rete_fuente=650.0, xml_raw=xml))
+
+    assert http.posted["retentions"] == [
+        {"id": "3", "amount": 250.0},
+        {"id": "7", "amount": 400.0},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_retention_created_in_alegra_after_a_miss_is_found_on_retry():
+    http = _RetentionBillClient([])
+    client = AlegraClient(http_client_factory=lambda: _BillClientContext(http))
+    from services.errors import RemoteAPIError
+
+    with pytest.raises(RemoteAPIError):
+        await client.crear_bill(_fe260())
+    http.retentions = _ALEGRA_RETENTIONS  # operator creates it in Alegra
+
+    await client.crear_bill(_fe260())
+
+    assert http.posted["retentions"] == [{"id": "5", "amount": 506047.5}]

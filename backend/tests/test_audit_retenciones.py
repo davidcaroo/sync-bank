@@ -26,3 +26,13 @@ def test_stored_doubled_retention_is_reported_with_reparsed_values():
 def test_correct_or_xml_less_rows_are_not_reported():
     ok = _row(id="f2", rete_fuente=506047.50, total=16699567.50)
     assert find_mismatches([ok, _row(id="f3", xml_raw=None)]) == []
+
+
+def test_apply_skips_invoices_already_caused_in_alegra():
+    from scripts.audit_retenciones import split_by_causation
+
+    pending, caused = split_by_causation(
+        [{"id": "a", "bill_id": None}, {"id": "b", "bill_id": "99"}]
+    )
+    assert [m["id"] for m in pending] == ["a"]
+    assert [m["id"] for m in caused] == ["b"]

@@ -32,6 +32,13 @@ def find_mismatches(rows: list[dict]) -> list[dict]:
     return out
 
 
+def split_by_causation(mismatches: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Caused invoices keep their stored values: Alegra already holds the old ones."""
+    pending = [m for m in mismatches if not m.get("bill_id")]
+    caused = [m for m in mismatches if m.get("bill_id")]
+    return pending, caused
+
+
 async def _alegra_bills(bill_ids: list[str]) -> dict:
     import httpx
 
@@ -88,15 +95,21 @@ def main() -> None:
             else:
                 print(f"    Alegra bill {m['bill_id']}: no encontrado")
 
-    if args.apply and mismatches:
+    pending, caused = split_by_causation(mismatches)
+    if caused:
+        print(
+            f"\n{len(caused)} ya causadas en Alegra: revisalas con contabilidad; "
+            "--apply no las toca para no ocultar la diferencia con Alegra."
+        )
+    if args.apply and pending:
         with transaction() as conn:
-            for m in mismatches:
+            for m in pending:
                 conn.execute(
                     "update facturas set rete_fuente = %s, rete_ica = %s, "
                     "rete_iva = %s, total = %s, updated_at = now() where id = %s",
                     (*(m["new"][f] for f in FIELDS), m["id"]),
                 )
-        print(f"\n{len(mismatches)} facturas actualizadas en la base de datos.")
+        print(f"\n{len(pending)} facturas pendientes actualizadas en la base de datos.")
 
 
 if __name__ == "__main__":

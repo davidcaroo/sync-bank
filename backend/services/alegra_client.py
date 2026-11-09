@@ -9,6 +9,7 @@ from models.factura import FacturaDIAN
 from services.errors import AlegraDuplicateBillError, RemoteAPIError
 from services.provider_tax_policy import resolve_provider_tax_mode
 from services.timezone_service import now_bogota
+from services.xml_parser import parse_retention_lines
 
 
 def _is_duplicate_bill_error(raw_error: str) -> bool:
@@ -318,31 +319,56 @@ class AlegraClient:
     async def _build_retentions_payload(
         self, client: httpx.AsyncClient, factura: FacturaDIAN
     ) -> list[dict]:
-        """Map the invoice's retentions to Alegra retentions by type and rate."""
-        wanted = [
-            ("FUENTE", "ReteFuente", factura.rete_fuente, factura.subtotal),
-            ("ICA", "ReteICA", factura.rete_ica, factura.subtotal),
-            ("IVA", "ReteIVA", factura.rete_iva, factura.iva),
-        ]
-        payload = []
-        for kind, label, amount, base in wanted:
-            amount = _to_float(amount, 0.0)
+        """Map the invoice's retentions to Alegra retentions by type and rate.
+
+        Rates come from each withholding subtotal in the XML; the totals-based
+        rate (amount / base) is only a fallback when the XML gives none.
+        """
+        labels = {"FUENTE": "ReteFuente", "ICA": "ReteICA", "IVA": "ReteIVA"}
+        bases = {"FUENTE": factura.subtotal, "ICA": factura.subtotal, "IVA": factura.iva}
+        totals = {"FUENTE": factura.rete_fuente, "ICA": factura.rete_ica, "IVA": factura.rete_iva}
+
+        lines = []
+        if factura.xml_raw:
+            try:
+                lines = parse_retention_lines(factura.xml_raw)
+            except Exception:
+                lines = []
+        grouped: dict[tuple, float] = {}
+        for kind, total in totals.items():
+            amount = _to_float(total, 0.0)
             if amount <= 0:
                 continue
-            base = _to_float(base, 0.0)
-            rate = amount / base * 100 if base > 0 else 0.0
-            match = next(
+            kind_lines = [l for l in lines if l["kind"] == kind and l["percent"] is not None]
+            if not kind_lines:
+                base = _to_float(bases[kind], 0.0)
+                kind_lines = [
+                    {"percent": amount / base * 100 if base > 0 else 0.0, "amount": amount}
+                ]
+            for line in kind_lines:
+                key = (kind, round(line["percent"], 4))
+                grouped[key] = grouped.get(key, 0.0) + line["amount"]
+
+        def find(retentions, kind, rate):
+            return next(
                 (
                     r
-                    for r in await self.get_retentions(client)
+                    for r in retentions
                     if kind in str(r.get("type") or "").upper()
                     and abs(_to_float(r.get("percentage"), -1) - rate) <= 0.01
                 ),
                 None,
             )
+
+        payload = []
+        for (kind, rate), amount in grouped.items():
+            match = find(await self.get_retentions(client), kind, rate)
+            if match is None:
+                self._retentions = None  # it may have just been created in Alegra
+                match = find(await self.get_retentions(client), kind, rate)
             if match is None:
                 raise RemoteAPIError(
-                    f"No se encontro una retencion activa en Alegra para {label} "
+                    f"No se encontro una retencion activa en Alegra para {labels[kind]} "
                     f"{rate:.2f}%. Creala en Alegra o causa la factura manualmente."
                 )
             payload.append({"id": str(match["id"]), "amount": round(amount, 2)})

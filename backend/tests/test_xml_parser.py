@@ -141,13 +141,15 @@ _NS = (
 )
 
 
-def _withholding(amount: float) -> str:
+def _withholding(amount: float, percent: float | None = None) -> str:
     return (
         "<cac:WithholdingTaxTotal>"
         f"<cbc:TaxAmount>{amount:.2f}</cbc:TaxAmount>"
         "<cac:TaxSubtotal>"
         f"<cbc:TaxAmount>{amount:.2f}</cbc:TaxAmount>"
-        "<cac:TaxCategory><cac:TaxScheme><cbc:ID>06</cbc:ID>"
+        "<cac:TaxCategory>"
+        + (f"<cbc:Percent>{percent}</cbc:Percent>" if percent is not None else "")
+        + "<cac:TaxScheme><cbc:ID>06</cbc:ID>"
         "<cbc:Name>ReteRenta</cbc:Name></cac:TaxScheme></cac:TaxCategory>"
         "</cac:TaxSubtotal></cac:WithholdingTaxTotal>"
     )
@@ -217,3 +219,15 @@ def test_header_and_line_retention_inside_attached_document_counted_once():
         + "]]></cbc:Description></cac:ExternalReference></cac:Attachment></AttachedDocument>"
     )
     assert parse_xml_dian(wrapped).rete_fuente == 506047.50
+
+
+def test_retention_lines_keep_each_rate_from_the_xml():
+    from services.xml_parser import parse_retention_lines
+
+    xml = _withholding_invoice_xml(header=False, lines=[100.0]).replace(
+        _withholding(100.0), _withholding(250.0, 2.5) + _withholding(400.0, 4)
+    )
+    assert parse_retention_lines(xml) == [
+        {"kind": "FUENTE", "percent": 2.5, "amount": 250.0},
+        {"kind": "FUENTE", "percent": 4.0, "amount": 400.0},
+    ]
